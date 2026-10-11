@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Portfolio & Risk — Swing Trader{% endblock %}
+{% block content %}
+<h2>Portfolio & Risk</h2>
+<p class="subtitle">Exposure, concentration, drawdown and limit monitoring</p>
+
+<div class="grid grid-4">
+  <div class="card"><h3>Total Equity</h3><div class="metric-value">₹{{ "{:,.2f}".format(equity) }}</div></div>
+  <div class="card"><h3>Available Cash</h3><div class="metric-value">₹{{ "{:,.2f}".format(cash) }}</div></div>
+  <div class="card"><h3>Invested</h3><div class="metric-value">₹{{ "{:,.2f}".format(invested) }}</div></div>
+  <div class="card"><h3>Exposure</h3><div class="metric-value">{{ exposure_pct }}%</div><div class="metric-sub">of equity</div></div>
+</div>
+
+{% if breaches %}
+<div class="section">
+  <div class="section-title" style="color:var(--red);">⚠ Risk Limit Breaches</div>
+  {% for b in breaches %}<div class="alert alert-error">{{ b }}</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if positions %}
+<div class="section">
+  <div class="section-title">Exposure by Stock</div>
+  <div class="card table-wrap">
+    <table>
+      <tr><th>Symbol</th><th>Qty</th><th>Market Value</th><th>% of Equity</th><th>Unrealized P&L</th><th>Stop Risk</th></tr>
+      {% for p in positions %}
+      <tr>
+        <td><strong>{{ p.symbol }}</strong></td>
+        <td>{{ p.qty }}</td>
+        <td>₹{{ "{:,.2f}".format(p.mv) }}</td>
+        <td>{{ p.pct }}%</td>
+        <td style="color:{{ 'var(--green)' if p.upnl >= 0 else 'var(--red)' }}">₹{{ "{:,.2f}".format(p.upnl) }}</td>
+        <td>{% if p.stop_risk %}₹{{ "{:,.2f}".format(p.stop_risk) }}{% else %}<span class="badge badge-warn">No stop</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="section-title">Concentration</div>
+  <div id="conc-chart" style="height:260px;"></div>
+</div>
+{% else %}
+<div class="alert alert-info">No open positions. Exposure is 0%.</div>
+{% endif %}
+
+<div class="section">
+  <div class="section-title">Risk Limits</div>
+  <div class="grid grid-3">
+    <div class="card"><h3>Max Position</h3><div class="metric-value">{{ settings.risk.max_position_pct }}%</div></div>
+    <div class="card"><h3>Max Portfolio Exposure</h3><div class="metric-value">{{ settings.risk.max_portfolio_exposure_pct }}%</div></div>
+    <div class="card"><h3>Max Risk/Trade</h3><div class="metric-value">{{ settings.risk.max_risk_per_trade_pct }}%</div></div>
+    <div class="card"><h3>Max Open Positions</h3><div class="metric-value">{{ settings.risk.max_open_positions }}</div></div>
+    <div class="card"><h3>Max Drawdown</h3><div class="metric-value">{{ settings.risk.max_drawdown_pct }}%</div></div>
+    <div class="card"><h3>Daily Loss Limit</h3><div class="metric-value">{{ settings.risk.daily_loss_limit_pct }}%</div></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="section-title">Reconciliation</div>
+  {% if recon.ok %}
+  <div class="alert alert-success">✓ Cash ledger consistent. Balance: ₹{{ "{:,.2f}".format(recon.cash) }}</div>
+  {% else %}
+  <div class="alert alert-error">{{ recon.problems | join('; ') }}</div>
+  {% endif %}
+</div>
+
+{% if positions %}
+<script>
+const labels = {{ positions | map(attribute='symbol') | list | tojson }};
+const values = {{ positions | map(attribute='mv') | list | tojson }};
+Plotly.newPlot('conc-chart', [{
+  labels: labels, values: values, type: 'pie',
+  marker: {colors: ['#58a6ff','#3fb950','#d29922','#f85149','#db6d28','#bc8cff']},
+  textinfo: 'label+percent'
+}], {
+  paper_bgcolor:'#161b22', plot_bgcolor:'#161b22', font:{color:'#8b949e'},
+  margin:{t:10,b:10,l:10,r:10}, showlegend:false
+}, {responsive:true});
+</script>
+{% endif %}
+{% endblock %}

@@ -165,6 +165,66 @@ def settings_page():
     return render_template("settings.html", **_ctx())
 
 
+@bp.get("/portfolio")
+def portfolio_page():
+    conn = current_app.config["DB"]
+    s = current_app.config["SETTINGS"]
+    engine = PaperEngine(conn, s)
+    positions = engine.positions()
+    cash = engine.cash()
+    rows = []
+    invested = 0.0
+    for p in positions:
+        inst = find_instrument(conn, p["symbol"])
+        last = None
+        if inst:
+            df = load_candles(conn, inst["id"])
+            if len(df):
+                last = float(df["close"].iloc[-1])
+        mv = (last or p["avg_cost"]) * p["qty"]
+        upnl = (last - p["avg_cost"]) * p["qty"] if last else 0.0
+        invested += mv
+        rows.append({
+            "symbol": p["symbol"], "qty": p["qty"], "avg_cost": p["avg_cost"],
+            "last": last, "mv": round(mv, 2), "upnl": round(upnl, 2),
+            "pct": round(100 * mv / (cash + invested + 1e-9), 1) if (cash + invested) else 0,
+            "stop_risk": (
+                round((p["avg_cost"] - p["stop_price"]) * p["qty"], 2) if p["stop_price"] else None
+            ),
+        })
+    equity = cash + invested
+    exposure_pct = round(100 * invested / equity, 1) if equity else 0
+    breaches = []
+    if exposure_pct > s.risk.max_portfolio_exposure_pct:
+        breaches.append(
+            f"Portfolio exposure {exposure_pct}% exceeds limit {s.risk.max_portfolio_exposure_pct}%"
+        )
+    for r in rows:
+        if r["pct"] > s.risk.max_position_pct:
+            breaches.append(
+                f"{r['symbol']} is {r['pct']}% of equity (limit {s.risk.max_position_pct}%)"
+            )
+    if len(rows) > s.risk.max_open_positions:
+        breaches.append(f"Open positions {len(rows)} exceeds limit {s.risk.max_open_positions}")
+    for r in rows:
+        if r["stop_risk"] is None:
+            breaches.append(f"{r['symbol']} has no stop-loss set")
+    recon = engine.reconcile()
+    return render_template("portfolio.html", **_ctx(
+        positions=rows, cash=cash, equity=round(equity, 2), invested=round(invested, 2),
+        exposure_pct=exposure_pct, breaches=breaches, recon=recon,
+    ))
+
+
+@bp.get("/journal")
+def journal_page():
+    conn = current_app.config["DB"]
+    entries = [dict(r) for r in conn.execute(
+        "SELECT * FROM journal_entries ORDER BY id DESC LIMIT 100"
+    ).fetchall()]
+    return render_template("journal.html", **_ctx(entries=entries))
+
+
 # ────────────────────────────────────────────── API: watchlist
 
 
@@ -439,6 +499,43 @@ def api_settings():
         return jsonify({"ok": True})
     except (ValueError, TypeError, SettingsError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
+
+
+# ────────────────────────────────────────────── API: journal
+
+
+@bp.post("/api/journal/add")
+def api_journal_add():
+    conn = current_app.config["DB"]
+    data = request.get_json(force=True)
+    symbol = (data.get("symbol") or "").strip().upper() or None
+    iid = None
+    if symbol:
+        inst = find_instrument(conn, symbol)
+        iid = inst["id"] if inst else None
+    with conn:
+        conn.execute(
+            """INSERT INTO journal_entries
+               (instrument_id, trade_ref, created_at, entry_rationale, planned_exit,
+                actual_exit, outcome, rule_violations, lessons)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (
+                iid, data.get("trade_ref") or None, datetime.now(UTC).isoformat(),
+                data.get("entry_rationale") or None, data.get("planned_exit") or None,
+                data.get("actual_exit") or None, data.get("outcome") or None,
+                data.get("rule_violations") or None, data.get("lessons") or None,
+            ),
+        )
+    return jsonify({"ok": True})
+
+
+@bp.get("/api/journal")
+def api_journal():
+    conn = current_app.config["DB"]
+    entries = [dict(r) for r in conn.execute(
+        "SELECT * FROM journal_entries ORDER BY id DESC LIMIT 100"
+    ).fetchall()]
+    return jsonify({"ok": True, "entries": entries})
 
 
 # ────────────────────────────────────────────── API: health

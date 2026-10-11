@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Journal — Swing Trader{% endblock %}
+{% block content %}
+<h2>Trade Journal</h2>
+<p class="subtitle">Record your reasoning, review outcomes, learn from mistakes</p>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="section-title">New Entry</div>
+  <div class="form-row">
+    <div><label>Symbol</label><input id="je-symbol" placeholder="TCS" maxlength="30"></div>
+    <div><label>Trade Ref (optional)</label><input id="je-ref" placeholder="e.g. TCS-2026-01"></div>
+    <div><label>Outcome</label><select id="je-outcome"><option value="">—</option><option>Win</option><option>Loss</option><option>Breakeven</option><option>Open</option></select></div>
+  </div>
+  <div class="form-row">
+    <div><label>Entry Rationale</label><textarea id="je-rationale" rows="3" placeholder="Why did you enter? What was the setup?"></textarea></div>
+  </div>
+  <div class="form-row">
+    <div><label>Planned Exit</label><textarea id="je-planned" rows="2" placeholder="Stop, target, time-based exit"></textarea></div>
+    <div><label>Actual Exit</label><textarea id="je-actual" rows="2" placeholder="What actually happened?"></textarea></div>
+  </div>
+  <div class="form-row">
+    <div><label>Rule Violations</label><textarea id="je-violations" rows="2" placeholder="Did you break your own rules?"></textarea></div>
+    <div><label>Lessons Learned</label><textarea id="je-lessons" rows="2" placeholder="What will you do differently?"></textarea></div>
+  </div>
+  <button class="btn btn-primary" onclick="addJournal()">Save Entry</button>
+  <span id="je-msg" style="margin-left:12px;font-size:13px;"></span>
+</div>
+
+<div class="section">
+  <div class="section-title">Entries ({{ entries | length }})</div>
+  {% for e in entries %}
+  <div class="card" style="margin-bottom:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div>
+        <strong style="font-size:16px;">{{ e.symbol or 'General' }}</strong>
+        {% if e.trade_ref %}<span style="color:var(--text2);font-size:12px;margin-left:8px;">{{ e.trade_ref }}</span>{% endif %}
+        {% if e.outcome %}<span class="badge badge-{{ 'ok' if e.outcome=='Win' else 'err' if e.outcome=='Loss' else 'wait' }}" style="margin-left:8px;">{{ e.outcome }}</span>{% endif %}
+      </div>
+      <small style="color:var(--text2);">{{ (e.created_at or '')[:10] }}</small>
+    </div>
+    {% if e.entry_rationale %}<p style="margin-bottom:6px;"><strong style="color:var(--text2);font-size:12px;">Rationale:</strong> {{ e.entry_rationale }}</p>{% endif %}
+    {% if e.planned_exit %}<p style="margin-bottom:6px;"><strong style="color:var(--text2);font-size:12px;">Planned exit:</strong> {{ e.planned_exit }}</p>{% endif %}
+    {% if e.actual_exit %}<p style="margin-bottom:6px;"><strong style="color:var(--text2);font-size:12px;">Actual exit:</strong> {{ e.actual_exit }}</p>{% endif %}
+    {% if e.rule_violations %}<p style="margin-bottom:6px;color:var(--yellow);"><strong style="font-size:12px;">Violations:</strong> {{ e.rule_violations }}</p>{% endif %}
+    {% if e.lessons %}<p style="color:var(--green);"><strong style="font-size:12px;color:var(--text2);">Lesson:</strong> {{ e.lessons }}</p>{% endif %}
+  </div>
+  {% endfor %}
+  {% if not entries %}<div class="alert alert-info">No journal entries yet. Record your first trade above.</div>{% endif %}
+</div>
+
+<script>
+async function addJournal() {
+  const r = await api('/api/journal/add', 'POST', {
+    symbol: document.getElementById('je-symbol').value.trim(),
+    trade_ref: document.getElementById('je-ref').value.trim(),
+    outcome: document.getElementById('je-outcome').value,
+    entry_rationale: document.getElementById('je-rationale').value.trim(),
+    planned_exit: document.getElementById('je-planned').value.trim(),
+    actual_exit: document.getElementById('je-actual').value.trim(),
+    rule_violations: document.getElementById('je-violations').value.trim(),
+    lessons: document.getElementById('je-lessons').value.trim(),
+  });
+  if (r.ok) { toast('Entry saved', 'success'); setTimeout(()=>location.reload(), 600); }
+  else toast(r.error, 'error');
+}
+</script>
+{% endblock %}
