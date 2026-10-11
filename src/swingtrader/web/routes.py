@@ -490,7 +490,20 @@ def api_data_import():
 @bp.post("/api/settings")
 def api_settings():
     s = current_app.config["SETTINGS"]
+    conn = current_app.config["DB"]
     data = request.get_json(force=True)
+    before = {
+        "initial_capital_inr": s.initial_capital_inr,
+        "max_position_pct": s.risk.max_position_pct,
+        "max_risk_per_trade_pct": s.risk.max_risk_per_trade_pct,
+        "max_open_positions": s.risk.max_open_positions,
+        "max_portfolio_exposure_pct": s.risk.max_portfolio_exposure_pct,
+        "daily_loss_limit_pct": s.risk.daily_loss_limit_pct,
+        "sma_fast": s.strategy.sma_fast,
+        "sma_slow": s.strategy.sma_slow,
+        "atr_stop_multiplier": s.strategy.atr_stop_multiplier,
+        "min_reward_risk": s.strategy.min_reward_risk,
+    }
     try:
         s.initial_capital_inr = float(data.get("initial_capital_inr", s.initial_capital_inr))
         s.risk.max_position_pct = float(data.get("max_position_pct", s.risk.max_position_pct))
@@ -501,6 +514,9 @@ def api_settings():
         s.risk.max_portfolio_exposure_pct = float(
             data.get("max_portfolio_exposure_pct", s.risk.max_portfolio_exposure_pct)
         )
+        s.risk.daily_loss_limit_pct = float(
+            data.get("daily_loss_limit_pct", s.risk.daily_loss_limit_pct)
+        )
         s.strategy.sma_fast = int(data.get("sma_fast", s.strategy.sma_fast))
         s.strategy.sma_slow = int(data.get("sma_slow", s.strategy.sma_slow))
         s.strategy.atr_stop_multiplier = float(
@@ -508,7 +524,30 @@ def api_settings():
         )
         s.strategy.min_reward_risk = float(data.get("min_reward_risk", s.strategy.min_reward_risk))
         save_settings(s)
-        return jsonify({"ok": True})
+        after = {
+            "initial_capital_inr": s.initial_capital_inr,
+            "max_position_pct": s.risk.max_position_pct,
+            "max_risk_per_trade_pct": s.risk.max_risk_per_trade_pct,
+            "max_open_positions": s.risk.max_open_positions,
+            "max_portfolio_exposure_pct": s.risk.max_portfolio_exposure_pct,
+            "daily_loss_limit_pct": s.risk.daily_loss_limit_pct,
+            "sma_fast": s.strategy.sma_fast,
+            "sma_slow": s.strategy.sma_slow,
+            "atr_stop_multiplier": s.strategy.atr_stop_multiplier,
+            "min_reward_risk": s.strategy.min_reward_risk,
+        }
+        changed = {k: {"before": before[k], "after": after[k]}
+                   for k in after if before[k] != after[k]}
+        if changed:
+            conn.execute(
+                "INSERT INTO audit_log (ts, level, event, details_json) VALUES (?,?,?,?)",
+                (
+                    datetime.now(UTC).isoformat(), "INFO", "settings_changed",
+                    json.dumps({"changed": changed}, ensure_ascii=False),
+                ),
+            )
+            conn.commit()
+        return jsonify({"ok": True, "changed": changed})
     except (ValueError, TypeError, SettingsError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 

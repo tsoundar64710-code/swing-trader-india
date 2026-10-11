@@ -157,3 +157,89 @@ def test_fees_recorded_on_fills(tmp_db: sqlite3.Connection) -> None:
     assert fill["taxes_fees"] > 0
     order = tmp_db.execute("SELECT status FROM orders").fetchone()
     assert order["status"] == "FILLED"
+
+
+# ── Phase 2: daily-loss enforcement ──────────────────────────────────────
+
+
+def test_realized_pnl_today_computed(tmp_db: sqlite3.Connection) -> None:
+    """realized_pnl_today() sums fills dated today."""
+    e = engine(tmp_db)
+    # No trades yet
+    assert e.realized_pnl_today() == pytest.approx(0.0)
+    # Buy then sell at a loss
+    e.place_market_order("L", "BUY", 10, ref_price=1000)
+    e.place_market_order("L", "SELL", 10, ref_price=900)  # loss
+    assert e.realized_pnl_today() < 0
+
+
+def test_daily_loss_blocks_new_buys(tmp_db: sqlite3.Connection) -> None:
+    """When today's realized losses hit the threshold, new BUY orders are rejected."""
+    s = AppSettings(initial_capital_inr=1_000)
+    # 2% of ₹1,000 = ₹20 threshold
+    e = PaperEngine(tmp_db, s)
+    # Simulate losses by directly inserting a losing fill (today's date)
+    from datetime import UTC, datetime
+    today = datetime.now(UTC).date().isoformat()
+    # Create a dummy order + fill with a -₹25 loss
+    cur = tmp_db.execute(
+        "INSERT INTO orders (client_order_id, ts, symbol, side, qty, status, created_at) "
+        "VALUES ('loss1', ?, 'LOSS', 'SELL', 1, 'FILLED', ?)",
+        (f"{today}T10:00:00+00:00", f"{today}T10:00:00+00:00"),
+    )
+    oid = cur.lastrowid
+    tmp_db.execute(
+        "INSERT INTO fills (order_id, ts, price, qty, pnl_realized) VALUES (?,?,?,?,?)",
+        (oid, f"{today}T10:00:00+00:00", 100, 1, -25.0),
+    )
+    tmp_db.commit()
+    assert e.realized_pnl_today() == pytest.approx(-25.0)
+    assert e.trading_blocked_by_daily_loss() is True
+    # New BUY must be rejected
+    with pytest.raises(OrderError, match="[Dd]aily loss limit"):
+        e.place_market_order("NEW", "BUY", 1, ref_price=100)
+    # SELL (exit) should still be allowed — only BUY is blocked
+    # (no position to sell here, so it will reject for insufficient holding, not daily loss)
+
+
+def test_no_daily_loss_allows_buys(tmp_db: sqlite3.Connection) -> None:
+    """When today's P&L is fine, BUY orders go through."""
+    e = engine(tmp_db, capital=1_000)
+    assert e.trading_blocked_by_daily_loss() is False
+    r = e.place_market_order("OK", "BUY", 1, ref_price=100)
+    assert r["status"] == "FILLED"
+
+
+def test_daily_loss_threshold_is_pct_of_equity(tmp_db: sqlite3.Connection) -> None:
+    """daily_loss_limit_inr = equity * daily_loss_limit_pct / 100."""
+    e = engine(tmp_db, capital=1_000)
+    # 2% of 1000 = 20
+    assert e.daily_loss_limit_inr() == pytest.approx(20.0)
+
+
+def test_audit_log_table_exists(tmp_db: sqlite3.Connection) -> None:
+    """audit_log table is present in schema."""
+    row = tmp_db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='audit_log'"
+    ).fetchone()
+    assert row is not None
+
+
+def test_audit_log_writes_on_settings_change(tmp_db: sqlite3.Connection) -> None:
+    """Directly verify audit_log gets a row when settings_changed is inserted (schema works)."""
+    import json as _json
+    from datetime import UTC, datetime
+    tmp_db.execute(
+        "INSERT INTO audit_log (ts, level, event, details_json) VALUES (?,?,?,?)",
+        (
+            datetime.now(UTC).isoformat(), "INFO", "settings_changed",
+            _json.dumps({"changed": {"max_risk_per_trade_pct": {"before": 1.0, "after": 1.5}}}),
+        ),
+    )
+    tmp_db.commit()
+    row = tmp_db.execute(
+        "SELECT event, details_json FROM audit_log WHERE event='settings_changed'"
+    ).fetchone()
+    assert row is not None
+    details = _json.loads(row["details_json"])
+    assert "max_risk_per_trade_pct" in details["changed"]

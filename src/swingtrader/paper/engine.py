@@ -84,6 +84,14 @@ class PaperEngine:
             raise OrderError("Quantity must be a whole number >= 1.")
         if ref_price <= 0:
             raise OrderError("Reference price must be positive.")
+        if side == "BUY" and self.trading_blocked_by_daily_loss():
+            pnl = self.realized_pnl_today()
+            limit = self.daily_loss_limit_inr()
+            raise OrderError(
+                f"Daily loss limit reached: today's realized P&L is ₹{pnl:,.2f} "
+                f"(threshold -₹{limit:,.2f}). New BUY orders are blocked until "
+                f"the next session per loss_cooldown_sessions."
+            )
         cid = client_order_id or uuid.uuid4().hex
         fill_price = apply_slippage(ref_price, side, self.settings.costs)
 
@@ -211,6 +219,27 @@ class PaperEngine:
                 "SELECT * FROM orders ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
         ]
+
+    def realized_pnl_today(self) -> float:
+        """Sum of realized P&L from fills dated today (UTC)."""
+        today = datetime.now(UTC).date().isoformat()
+        row = self.conn.execute(
+            "SELECT COALESCE(SUM(pnl_realized),0) FROM fills "
+            "WHERE pnl_realized IS NOT NULL AND ts LIKE ?",
+            (f"{today}%",),
+        ).fetchone()
+        return float(row[0])
+
+    def daily_loss_limit_inr(self) -> float:
+        """Absolute INR daily-loss threshold from percentage of current equity."""
+        equity = self.equity({})
+        return equity * self.settings.risk.daily_loss_limit_pct / 100
+
+    def trading_blocked_by_daily_loss(self) -> bool:
+        """True when today's realized losses have hit the configured threshold."""
+        pnl = self.realized_pnl_today()
+        limit = self.daily_loss_limit_inr()
+        return pnl <= -limit + 1e-6
 
     def equity(self, price_lookup: dict[str, float]) -> float:
         mv = sum(

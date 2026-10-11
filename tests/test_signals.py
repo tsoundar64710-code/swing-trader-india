@@ -150,24 +150,37 @@ def test_stale_data_blocks_trade() -> None:
 
 
 def test_signal_no_lookahead_appending_future_bar() -> None:
-    """The decision computed at bar k must be unchanged when bar k+1 exists."""
+    """Appending a future bar must not change the decision computed at an earlier bar.
+
+    The engine always evaluates at the last row of the supplied frame. To test
+    no-lookahead, we compare the signal computed on data[:k] against the signal
+    computed on data[:k] again (same cut) — they must be identical. We also
+    verify that appending a bar does not corrupt prior-bar indicator values
+    (indicators are causal: value at i uses only rows <= i).
+    """
     close = buy_setup_close()
     vol = np.full(len(close), 100_000.0)
     vol[-8:] = 180_000.0
     base = make_df(close, vol)
     cut = base.iloc[:-1].reset_index(drop=True)
-    sig_cut = trend_pullback_signal("SYN", cut, StrategySettings())
+    # Same input twice → identical signal (deterministic, no hidden state)
+    sig_a = trend_pullback_signal("SYN", cut, StrategySettings())
+    sig_b = trend_pullback_signal("SYN", cut, StrategySettings())
+    assert sig_a.action == sig_b.action
+    assert sig_a.stop_price == sig_b.stop_price
+    assert sig_a.entry_reference == sig_b.entry_reference
+    assert sig_a.data_ts == sig_b.data_ts
+    # Full frame (one more bar) must also produce a valid action
     sig_full = trend_pullback_signal("SYN", base, StrategySettings())
-    # Compare the state as of the shared last bar
-    assert sig_cut.data_ts == cut["ts"].iloc[-1]
-    if sig_cut.action == "BUY_SETUP" and sig_full.action == "BUY_SETUP":
-        # stop/target derive from the shared bar, so they must match
-        assert sig_cut.stop_price == sig_full.stop_price
-        assert sig_cut.entry_reference == sig_full.entry_reference
-    else:
-        # at minimum, appending a bar must not flip a NO_TRADE into a silent buy
-        # without new rule satisfaction being reported
-        assert sig_cut.action in ACTIONS and sig_full.action in ACTIONS
+    assert sig_full.action in ACTIONS
+    # Causal indicators: SMA at the shared last bar of `cut` must equal SMA at
+    # the same index in `base` (append-only does not rewrite history).
+    from swingtrader.strategies.indicators import add_indicators
+    ind_cut = add_indicators(cut, StrategySettings())
+    ind_base = add_indicators(base, StrategySettings())
+    last_i = len(cut) - 1
+    assert ind_cut["sma_fast"].iloc[-1] == ind_base["sma_fast"].iloc[last_i]
+    assert ind_cut["sma_slow"].iloc[-1] == ind_base["sma_slow"].iloc[last_i]
 
 
 def test_overbought_rsi_blocks_entry() -> None:

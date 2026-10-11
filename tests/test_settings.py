@@ -13,8 +13,10 @@ from swingtrader.core.settings import AppSettings, load_settings, save_settings
 
 
 def test_defaults_are_conservative(settings: AppSettings) -> None:
-    assert settings.initial_capital_inr == 10_000
-    assert settings.risk.max_risk_per_trade_pct <= 2.0
+    assert settings.initial_capital_inr == 1_000  # ₹1,000 paper profile
+    assert settings.risk.max_risk_per_trade_pct <= 2.0  # ₹10 risk/trade on ₹1,000
+    assert settings.risk.daily_loss_limit_pct == 2.0  # ₹20 daily loss on ₹1,000
+    assert settings.strategy.min_reward_risk == 2.0
     assert settings.ai.enabled is False
     assert settings.live_trading_enabled is False
 

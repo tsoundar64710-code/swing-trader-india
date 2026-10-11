@@ -23,7 +23,12 @@ DB_PATH = DATA_DIR / "swingtrader.db"
 
 
 class RiskLimits(BaseModel):
-    """Portfolio and per-trade risk limits (conservative defaults)."""
+    """Portfolio and per-trade risk limits (₹1,000 paper-capital profile).
+
+    Defaults are tuned for a ₹1,000 virtual account:
+        max_risk_per_trade_pct = 1.0  →  ₹10 risk per trade
+        daily_loss_limit_pct   = 2.0  →  ₹20 daily loss threshold
+    """
 
     max_capital_committed_pct: float = Field(50.0, gt=0, le=100)
     max_position_pct: float = Field(20.0, gt=0, le=100)
@@ -31,7 +36,7 @@ class RiskLimits(BaseModel):
     max_risk_per_trade_pct: float = Field(1.0, gt=0, le=10)
     max_open_positions: int = Field(3, ge=1, le=50)
     max_drawdown_pct: float = Field(15.0, gt=0, le=100)
-    daily_loss_limit_pct: float = Field(3.0, gt=0, le=100)
+    daily_loss_limit_pct: float = Field(2.0, gt=0, le=100)
     loss_cooldown_sessions: int = Field(2, ge=0, le=60)
     min_avg_daily_value_inr: float = Field(1_000_000.0, ge=0)
 
@@ -121,7 +126,7 @@ class StrategySettings(BaseModel):
     rsi_os: float = Field(30.0, gt=0, lt=100)
     atr_period: int = Field(14, ge=2)
     atr_stop_multiplier: float = Field(2.0, gt=0)
-    min_reward_risk: float = Field(1.5, gt=0)
+    min_reward_risk: float = Field(2.0, gt=0)
     volume_sma_period: int = Field(20, ge=2)
 
     @field_validator("sma_slow")
@@ -137,7 +142,7 @@ class AppSettings(BaseModel):
     """Root settings object."""
 
     version: int = 1
-    initial_capital_inr: float = Field(10_000.0, gt=0)
+    initial_capital_inr: float = Field(1_000.0, gt=0)
     risk: RiskLimits = Field(default_factory=RiskLimits)
     costs: CostAssumptions = Field(default_factory=CostAssumptions)
     data: DataSettings = Field(default_factory=DataSettings)
