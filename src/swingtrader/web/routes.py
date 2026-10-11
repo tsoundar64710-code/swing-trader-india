@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hmac
 import json
 from datetime import UTC, datetime
 
@@ -13,6 +14,7 @@ from flask import (
     render_template,
     request,
     send_file,
+    session,
 )
 
 from swingtrader import LIVE_TRADING_ENABLED, OPERATING_MODE, __version__
@@ -40,6 +42,16 @@ from swingtrader.strategies.persistence import save_signal
 from swingtrader.strategies.signals import trend_pullback_signal
 
 bp = Blueprint("main", __name__)
+
+
+@bp.before_request
+def _csrf_protect() -> None:
+    """Validate CSRF token on all state-changing requests (POST/PUT/DELETE/PATCH)."""
+    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        token = session.get("csrf_token", "")
+        supplied = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
+        if not token or not supplied or not hmac.compare_digest(token, supplied):
+            return jsonify({"ok": False, "error": "Invalid or missing CSRF token."}), 403
 
 
 def _ctx(**extra):

@@ -9,20 +9,21 @@ laptop with 8 GB RAM. **No live order submission. No guaranteed returns.**
 | Feature | Status |
 |---|---|
 | CSV historical data import + validation | ✅ Tested (22 tests) |
-| Live/EOD market data via Yahoo Finance (NSE/BSE) | ✅ Verified — END_OF_DAY quality |
+| EOD market data via Yahoo Finance (NSE/BSE) | ✅ Verified — END_OF_DAY/delayed only, never real-time |
 | Market dashboard: indices, breadth, sectors, macro | ✅ Verified |
 | News retrieval with impact tagging | ✅ Verified |
 | Stock scanner with transparent scoring | ✅ Verified |
 | Trade Planner (entry/stop/target/costs/sizing) | ✅ Verified |
-| Alert engine + notification centre | ✅ Verified |
+| Alert engine + in-app notification centre | ✅ Verified (local log + toast; no email/SMS) |
 | Deterministic indicators (SMA, RSI, ATR, volume) | ✅ Tested |
 | Rule-based signal engine (BUY_SETUP / WAIT / NO_TRADE) | ✅ Tested |
 | Position sizing + risk limits + verified cost engine | ✅ Tested |
 | Backtesting with leakage protections | ✅ Tested |
 | Paper-trading engine with reconciliation | ✅ Tested |
-| Flask web UI (15 pages, 30+ API endpoints) | ✅ Running |
+| Flask web UI (17 pages, 30+ API endpoints) | ✅ Running |
+| CSRF protection on all state-changing endpoints | ✅ Implemented |
 | Portfolio & Risk + Journal | ✅ Implemented |
-| Local AI assistant (market context, no external LLM) | ✅ Implemented |
+| Local AI assistant (market context, no external LLM) | ✅ Implemented (disabled by default) |
 | Live trading (Groww) | ❌ Disabled by design |
 
 ## Quick start (Windows)
@@ -57,14 +58,17 @@ Import daily OHLCV CSV files with columns:
 `Date, Open, High, Low, Close, Volume`
 
 Invalid rows are dropped and reported. Missing candles are never fabricated.
+Market data from yfinance is END_OF_DAY/delayed — never labeled as real-time.
 
 ## Safety
 
 - Live trading is **hard-disabled** in code (`LIVE_TRADING_ENABLED = False`)
 - All broker methods raise `OrderError`
 - Binds to `127.0.0.1` only (never expose to the internet)
+- CSRF protection on all POST/PUT/DELETE/PATCH endpoints
+- Random-per-install session secret (stored locally, not in git)
 - No API keys required or stored
-- Cost rates are marked UNVERIFIED until checked against official sources
+- Cost rates verified against official NSE/SEBI sources (2026-10-11)
 
 ## Disclaimer
 

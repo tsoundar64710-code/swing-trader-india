@@ -8,6 +8,7 @@ __pycache__/
 
 # Secrets and local env
 .env
+data/.secret_key
 
 # Local data (user imports, paper-trading DB, backups, settings)
 data/imports/*

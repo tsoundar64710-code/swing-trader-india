@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 0.2.1 (2026-10-11) — Security & Cleanup Release
+
+### Added
+- CSRF protection on all state-changing endpoints (POST/PUT/DELETE/PATCH).
+  Lightweight manual token: random per-install, stored in Flask session,
+  validated via `hmac.compare_digest`. No new dependencies.
+- Random-per-install session secret key (persisted to `data/.secret_key`,
+  gitignored). Replaces hardcoded `"swingtrader-local-only"`.
+
+### Changed
+- `data/settings.json` reset to verified defaults: correct STT 0.1%,
+  stamp duty 0.015%, exchange 0.00297%, SEBI 0.0001%, `ai.enabled=false`.
+  Prior file had stale UNVERIFIED rates that undercharged costs 10-100x.
+
+### Removed
+- Dead Streamlit UI (`src/swingtrader/ui/`, 11 files). Unused since Flask
+  migration; no external imports.
+
+### Fixed
+- Version string bumped to 0.2.1 (was 0.1.0 while changelog said 0.2.0).
+- Documentation reconciled: 17 pages, 30+ API endpoints, EOD-only market
+  data, notification scope (in-app + Windows toast only, no email/SMS),
+  Streamlit removal, CSRF status in SECURITY.md, duplicate rows in
+  PROJECT_STATUS.md.
+
 ## 0.2.0 (2026-10-11) — Market Intelligence Release
 
 ### Added

@@ -1,6 +1,11 @@
 // Swing Trader India — client helpers
 async function api(url, method, body) {
-  const opts = { method: method || 'GET', headers: {'Content-Type': 'application/json'} };
+  const m = (method || 'GET').toUpperCase();
+  const opts = { method: m, headers: {'Content-Type': 'application/json'} };
+  if (m !== 'GET') {
+    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    if (token) opts.headers['X-CSRF-Token'] = token;
+  }
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(url, opts);
   return r.json();

@@ -13,6 +13,8 @@
 | Sensitive data in logs | Redaction filter for keys/tokens/passwords | ✓ |
 | Public exposure | Binds to 127.0.0.1 only | ✓ |
 | XSS | Jinja2 auto-escaping | ✓ |
+| CSRF | Manual token on all POST/PUT/DELETE/PATCH routes; `hmac.compare_digest` | ✓ (v0.2.1) |
+| Predictable session secret | Random-per-install key persisted to `data/.secret_key` (gitignored) | ✓ (v0.2.1) |
 | Resource exhaustion | Row count limits, file size limits | ✓ |
 | Dependency vulnerabilities | Pinned versions, `pip-audit` recommended | ✓ |
 | Unauthorized access | Single-user local app, no auth needed | Documented |
@@ -31,3 +33,4 @@
 2. Do NOT commit `.env` files
 3. Run `pip-audit` periodically to check for vulnerabilities
 4. Use a dedicated Windows user account if sharing the machine
+5. `data/.secret_key` is auto-generated and gitignored — do not commit it
