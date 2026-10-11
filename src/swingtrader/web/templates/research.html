@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ symbol }} — Research{% endblock %}
+{% block content %}
+<h2>{{ symbol }} <small style="font-size:13px;color:var(--text2);">{{ inst.exchange }}</small></h2>
+<p class="subtitle">Data as of {{ sig.data_ts if sig else '—' }} · Strategy: trend_pullback_v1</p>
+
+{% if sig %}
+<div class="card" style="margin-bottom:20px;border-left:3px solid {{ 'var(--green)' if sig.action=='BUY_SETUP' else 'var(--yellow)' if sig.action=='WAIT' else 'var(--text2)' }};">
+  <h3>Signal</h3>
+  <div style="font-size:20px;font-weight:700;margin:8px 0;">{{ sig.action }}</div>
+  {% if sig.action == 'BUY_SETUP' %}
+  <div class="grid grid-4" style="margin:12px 0 0;">
+    <div><h3>Entry Ref</h3><div style="font-size:18px;font-weight:700;">₹{{ sig.entry_reference }}</div></div>
+    <div><h3>Stop</h3><div style="font-size:18px;font-weight:700;color:var(--red);">₹{{ sig.stop_price }}</div></div>
+    <div><h3>Target</h3><div style="font-size:18px;font-weight:700;color:var(--green);">₹{{ sig.target_price }}</div></div>
+    <div><h3>Reward:Risk</h3><div style="font-size:18px;font-weight:700;">{{ sig.reward_risk }}</div></div>
+  </div>
+  {% endif %}
+  <ul class="reasons" style="margin-top:10px;">{% for r in sig.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+  <details style="margin-top:10px;"><summary style="cursor:pointer;color:var(--text2);font-size:12px;">Rule audit</summary>
+    <p style="font-size:12px;margin-top:6px;"><strong>Satisfied:</strong> {{ sig.rules_satisfied | join(', ') or 'none' }}</p>
+    <p style="font-size:12px;"><strong>Failed:</strong> {{ sig.rules_failed | join(', ') or 'none' }}</p>
+  </details>
+</div>
+{% endif %}
+
+{% if candles %}
+<div class="chart-box"><div id="price-chart" style="height:420px;"></div></div>
+{% endif %}
+
+{% if plan %}
+<div class="section">
+  <div class="section-title">Position Size Estimate</div>
+  {% if plan.accepted %}
+  <div class="grid grid-4">
+    <div class="card"><h3>Quantity</h3><div class="metric-value">{{ plan.qty }}</div></div>
+    <div class="card"><h3>Notional</h3><div class="metric-value">₹{{ "{:,.0f}".format(plan.notional_inr) }}</div></div>
+    <div class="card"><h3>Est. Buy Costs</h3><div class="metric-value">₹{{ "{:,.2f}".format(plan.est_buy_costs.total) }}</div></div>
+    <div class="card"><h3>Est. Total Risk</h3><div class="metric-value">₹{{ "{:,.2f}".format(plan.est_total_risk_inr) }}</div></div>
+  </div>
+  {% else %}
+  <div class="alert alert-error">Position rejected: {{ plan.rejections | join('; ') }}</div>
+  {% endif %}
+  {% for n in plan.notes %}<div class="alert alert-warn">{{ n }}</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if ind_tail %}
+<div class="section">
+  <div class="section-title">Recent Indicators</div>
+  <div class="card table-wrap">
+    <table>
+      <tr><th>Date</th><th>Close</th><th>SMA Fast</th><th>SMA Slow</th><th>RSI</th><th>ATR</th></tr>
+      {% for row in ind_tail[-10:] %}
+      <tr><td>{{ row.ts[:10] if row.ts else '—' }}</td><td>₹{{ "{:,.2f}".format(row.close) }}</td>
+        <td>{{ "{:,.2f}".format(row.sma_fast) if row.sma_fast else '—' }}</td>
+        <td>{{ "{:,.2f}".format(row.sma_slow) if row.sma_slow else '—' }}</td>
+        <td>{{ "{:,.1f}".format(row.rsi) if row.rsi else '—' }}</td>
+        <td>{{ "{:,.2f}".format(row.atr) if row.atr else '—' }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if candles %}
+<script>
+const candles = {{ candles | tojson }};
+const traces = [
+  {x: candles.map(c=>c.ts), open: candles.map(c=>c.open), high: candles.map(c=>c.high),
+   low: candles.map(c=>c.low), close: candles.map(c=>c.close), type:'candlestick', name:'Price'},
+];
+Plotly.newPlot('price-chart', traces, {
+  paper_bgcolor:'#161b22', plot_bgcolor:'#161b22',
+  font:{color:'#8b949e'}, margin:{t:10,b:10,l:40,r:10},
+  xaxis:{rangeslider:false, gridcolor:'#30363d'},
+  yaxis:{gridcolor:'#30363d'}
+}, {responsive:true});
+</script>
+{% endif %}
+{% endblock %}

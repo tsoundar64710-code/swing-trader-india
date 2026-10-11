@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Strategy Lab — Swing Trader{% endblock %}
+{% block content %}
+<h2>Strategy Lab</h2>
+<p class="subtitle">Backtesting with chronological splits. Past results never predict future returns.</p>
+
+<div class="alert alert-warn">{{ cost_warning }}</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="form-row">
+    <div><label>Symbol</label>
+      <select id="bt-symbol">
+        {% for r in watchlist if r.candle_count > 0 %}<option value="{{ r.symbol }}">{{ r.symbol }} ({{ r.exchange }})</option>{% endfor %}
+      </select>
+    </div>
+    <div><label>Mode</label>
+      <select id="bt-mode">
+        <option value="full">Full sample</option>
+        <option value="splits">Chronological splits</option>
+        <option value="walk_forward">Walk-forward</option>
+      </select>
+    </div>
+    <div><label>Capital (₹)</label><input id="bt-capital" type="number" value="{{ settings.initial_capital_inr }}" min="1000"></div>
+  </div>
+  <div class="form-row">
+    <div><label>Fast SMA</label><input id="bt-fast" type="number" value="{{ settings.strategy.sma_fast }}"></div>
+    <div><label>Slow SMA</label><input id="bt-slow" type="number" value="{{ settings.strategy.sma_slow }}"></div>
+    <div><label>ATR Stop ×</label><input id="bt-atr" type="number" step="0.1" value="{{ settings.strategy.atr_stop_multiplier }}"></div>
+    <div><label>Min R:R</label><input id="bt-rr" type="number" step="0.1" value="{{ settings.strategy.min_reward_risk }}"></div>
+  </div>
+  <button class="btn btn-primary" onclick="runBacktest()" id="bt-btn">Run Backtest</button>
+</div>
+
+<div id="bt-results"></div>
+
+<script>
+async function runBacktest() {
+  const btn = document.getElementById('bt-btn');
+  btn.textContent = 'Running…'; btn.disabled = true;
+  const r = await api('/api/backtest/run', 'POST', {
+    symbol: document.getElementById('bt-symbol').value,
+    mode: document.getElementById('bt-mode').value,
+    capital: parseFloat(document.getElementById('bt-capital').value),
+    sma_fast: parseInt(document.getElementById('bt-fast').value),
+    sma_slow: parseInt(document.getElementById('bt-slow').value),
+    atr_mult: parseFloat(document.getElementById('bt-atr').value),
+    min_rr: parseFloat(document.getElementById('bt-rr').value),
+  });
+  btn.textContent = 'Run Backtest'; btn.disabled = false;
+  if (!r.ok) { document.getElementById('bt-results').innerHTML = `<div class="alert alert-error">${r.error}</div>`; return; }
+  let html = '';
+  for (const [name, d] of Object.entries(r.results)) {
+    const m = d.metrics;
+    html += `<div class="section"><div class="section-title">Split: ${name} <small style="color:var(--text2);">(run #${d.run_id})</small></div>`;
+    if (m.status !== 'ok') html += `<div class="alert alert-error">Status: ${m.status} — not a successful result.</div>`;
+    html += `<div class="grid grid-4">
+      <div class="card"><h3>Trades</h3><div class="metric-value">${m.trade_count}</div></div>
+      <div class="card"><h3>Net Return</h3><div class="metric-value" style="color:${m.net_return_pct>=0?'var(--green)':'var(--red)'}">${m.net_return_pct}%</div></div>
+      <div class="card"><h3>Max Drawdown</h3><div class="metric-value">${m.max_drawdown_pct}%</div></div>
+      <div class="card"><h3>Win Rate</h3><div class="metric-value">${m.win_rate_pct}%</div></div>
+    </div>
+    <div class="grid grid-4">
+      <div class="card"><h3>Net P&L</h3><div class="metric-value">₹${fmt(m.net_pnl)}</div></div>
+      <div class="card"><h3>Total Costs</h3><div class="metric-value">₹${fmt(m.total_costs)}</div></div>
+      <div class="card"><h3>Profit Factor</h3><div class="metric-value">${m.profit_factor}</div></div>
+      <div class="card"><h3>Benchmark</h3><div class="metric-value">${m.benchmark_return_pct}%</div></div>
+    </div>`;
+    if (d.equity_curve.length) {
+      html += `<div class="chart-box"><div id="eq-${name}" style="height:280px;"></div></div>`;
+    }
+    if (d.trades.length) {
+      html += `<div class="card table-wrap"><table><tr><th>Entry</th><th>Exit</th><th>Qty</th><th>Entry ₹</th><th>Exit ₹</th><th>P&L</th><th>Reason</th></tr>`;
+      for (const t of d.trades.slice(-20)) {
+        html += `<tr><td>${t.entry_ts}</td><td>${t.exit_ts}</td><td>${t.qty}</td><td>₹${fmt(t.entry_price)}</td><td>₹${fmt(t.exit_price)}</td><td style="color:${t.pnl>=0?'var(--green)':'var(--red)'}">₹${fmt(t.pnl)}</td><td>${t.exit_reason||''}</td></tr>`;
+      }
+      html += `</table></div>`;
+    }
+    for (const w of d.warnings) html += `<div class="alert alert-info" style="font-size:12px;">${w}</div>`;
+    html += `</div>`;
+  }
+  document.getElementById('bt-results').innerHTML = html;
+  // Draw equity charts
+  for (const [name, d] of Object.entries(r.results)) {
+    if (d.equity_curve.length) {
+      Plotly.newPlot('eq-'+name, [{y:d.equity_curve, x:d.dates, type:'scatter', line:{color:'#58a6ff'}, fill:'tozeroy', fillcolor:'rgba(88,166,255,.1)'}], {
+        paper_bgcolor:'#161b22', plot_bgcolor:'#161b22', font:{color:'#8b949e'},
+        margin:{t:10,b:10,l:40,r:10}, xaxis:{gridcolor:'#30363d'}, yaxis:{gridcolor:'#30363d'}
+      }, {responsive:true});
+    }
+  }
+}
+</script>
+{% endblock %}

@@ -17,4 +17,4 @@ if (-not (Test-Path ".env") -and (Test-Path ".env.example")) {
   Write-Host "==> Created .env from .env.example (placeholders only)"
 }
 
-Write-Host "Setup complete. Next: .\scripts\run.ps1"
+Write-Host "Setup complete. Next: .\scripts\run.ps1 or double-click scripts\start_app.bat"

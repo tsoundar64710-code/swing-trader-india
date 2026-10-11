@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Paper Trading — Swing Trader{% endblock %}
+{% block content %}
+<h2>Paper Trading</h2>
+<p class="subtitle">Simulated execution only — not real Groww orders</p>
+
+<div class="grid grid-4">
+  <div class="card"><h3>Simulated Cash</h3><div class="metric-value">₹{{ "{:,.2f}".format(cash) }}</div></div>
+  <div class="card"><h3>Portfolio Equity</h3><div class="metric-value">₹{{ "{:,.2f}".format(equity) }}</div></div>
+  <div class="card"><h3>Realized P&L</h3><div class="metric-value" style="color:{{ 'var(--green)' if realized_pnl >= 0 else 'var(--red)' }}">₹{{ "{:,.2f}".format(realized_pnl) }}</div></div>
+  <div class="card"><h3>Open Positions</h3><div class="metric-value">{{ positions | length }}</div></div>
+</div>
+
+<div class="card" style="margin:20px 0;">
+  <div class="section-title">Place Simulated Order</div>
+  <div class="form-row">
+    <div><label>Symbol</label><input id="po-symbol" placeholder="TCS" maxlength="30"></div>
+    <div><label>Side</label><select id="po-side"><option>BUY</option><option>SELL</option></select></div>
+    <div><label>Qty</label><input id="po-qty" type="number" min="1" value="1"></div>
+    <div><label>Reference Price (₹)</label><input id="po-price" type="number" step="0.05" min="0.01" value="100"></div>
+  </div>
+  <button class="btn btn-primary" onclick="placeOrder()">Submit Simulated Order</button>
+  <span style="margin-left:12px;font-size:12px;color:var(--text2);">Fills include slippage assumption</span>
+</div>
+
+{% if positions %}
+<div class="section">
+  <div class="section-title">Open Positions</div>
+  <div class="card table-wrap">
+    <table>
+      <tr><th>Symbol</th><th>Qty</th><th>Avg Cost</th><th>Last</th><th>Stop</th><th>Target</th><th>Actions</th></tr>
+      {% for p in positions %}
+      <tr>
+        <td><strong>{{ p.symbol }}</strong></td><td>{{ p.qty }}</td>
+        <td>₹{{ "{:,.2f}".format(p.avg_cost) }}</td>
+        <td>{% if p.symbol in prices %}₹{{ "{:,.2f}".format(prices[p.symbol]) }}{% else %}—{% endif %}</td>
+        <td>{{ p.stop_price or '—' }}</td><td>{{ p.target_price or '—' }}</td>
+        <td>
+          <button class="btn btn-sm btn-danger" onclick="closePos('{{ p.symbol }}')">Close</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  <button class="btn btn-outline" style="margin-top:10px;" onclick="monitorStops()">Run Stop/Target Monitor</button>
+</div>
+{% endif %}
+
+{% if orders %}
+<div class="section">
+  <div class="section-title">Order History</div>
+  <div class="card table-wrap">
+    <table>
+      <tr><th>#</th><th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Status</th><th>Reason</th></tr>
+      {% for o in orders %}
+      <tr>
+        <td>{{ o.id }}</td><td>{{ (o.ts or '')[:19] }}</td><td>{{ o.symbol }}</td>
+        <td><span class="badge badge-{{ 'buy' if o.side=='BUY' else 'sell' }}">{{ o.side }}</span></td>
+        <td>{{ o.qty }}</td>
+        <td><span class="badge badge-{{ 'ok' if o.status=='FILLED' else 'err' if o.status=='REJECTED' else 'wait' }}">{{ o.status }}</span></td>
+        <td style="font-size:12px;">{{ o.reason or '' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="alert {{ 'alert-success' if recon.ok else 'alert-error' }}">
+  {% if recon.ok %}✓ Reconciliation OK — cash ledger consistent (₹{{ "{:,.2f}".format(recon.cash) }}){% else %}⚠ {{ recon.problems | join('; ') }}{% endif %}
+</div>
+
+<script>
+async function placeOrder() {
+  const r = await api('/api/paper/order', 'POST', {
+    symbol: document.getElementById('po-symbol').value.trim(),
+    side: document.getElementById('po-side').value,
+    qty: parseInt(document.getElementById('po-qty').value),
+    ref_price: parseFloat(document.getElementById('po-price').value),
+  });
+  if (r.status === 'FILLED') { toast(`SIMULATED ${r.side} ${r.qty} ${r.symbol} @ ₹${r.fill_price}`, 'success'); setTimeout(()=>location.reload(), 800); }
+  else if (r.error) toast(r.error, 'error');
+  else if (r.status === 'REJECTED') toast(r.reason, 'error');
+}
+async function closePos(sym) {
+  const r = await api('/api/paper/close/'+sym, 'POST');
+  if (r.status === 'FILLED') { toast('Closed '+sym+' @ ₹'+r.fill_price, 'success'); setTimeout(()=>location.reload(), 800); }
+  else toast(r.error || r.reason, 'error');
+}
+async function monitorStops() {
+  const r = await api('/api/paper/monitor', 'POST');
+  if (r.exits.length) { toast(r.exits.length+' exit(es) triggered', 'success'); setTimeout(()=>location.reload(), 800); }
+  else toast('No stops/targets triggered', 'info');
+}
+</script>
+{% endblock %}

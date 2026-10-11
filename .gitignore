@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.py[cod]
 .venv/
@@ -9,17 +9,18 @@ __pycache__/
 # Secrets and local env
 .env
 
-# Local data (user imports, paper-trading DB, backups)
+# Local data (user imports, paper-trading DB, backups, settings)
 data/imports/*
 data/backups/*
+data/*.db
+data/*.db-*
+data/*.db-shm
+data/*.db-wal
+data/settings.json
+data/logs/
+data/exports/
 !data/imports/.gitkeep
 !data/backups/.gitkeep
-
-# App runtime state
-*.db
-*.db-journal
-*.log
-logs/
 
 # OS
 Thumbs.db

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Data Centre — Swing Trader{% endblock %}
+{% block content %}
+<h2>Data Centre</h2>
+<p class="subtitle">Import daily OHLCV CSV files. Invalid rows are dropped and reported.</p>
+
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="section-title">Import CSV</div>
+  <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">Expected columns: <code>Date, Open, High, Low, Close, Volume</code></p>
+  <form method="POST" action="/data/import" enctype="multipart/form-data">
+    <div class="form-row">
+      <div><label>Symbol</label><input name="symbol" placeholder="RELIANCE" required maxlength="30"></div>
+      <div><label>Exchange</label><select name="exchange"><option>NSE</option><option>BSE</option></select></div>
+      <div><label>Adjusted?</label><select name="adjusted"><option value="unknown">Unknown</option><option value="adjusted">Adjusted</option><option value="unadjusted">Unadjusted</option></select></div>
+    </div>
+    <div class="form-row">
+      <div><label>CSV File</label><input type="file" name="file" accept=".csv" required></div>
+      <div style="flex:0;align-self:end;"><button class="btn btn-primary" type="submit">Validate & Import</button></div>
+    </div>
+  </form>
+</div>
+
+{% if report %}
+<div class="section">
+  <div class="section-title">Validation Report</div>
+  <div class="grid grid-4">
+    <div class="card"><h3>Rows Read</h3><div class="metric-value">{{ report.total_rows }}</div></div>
+    <div class="card"><h3>Rows Kept</h3><div class="metric-value">{{ report.valid_rows }}</div></div>
+    <div class="card"><h3>Duplicates Removed</h3><div class="metric-value">{{ report.duplicates_removed }}</div></div>
+    <div class="card"><h3>Invalid OHLC</h3><div class="metric-value">{{ report.dropped_invalid_ohlc }}</div></div>
+  </div>
+  {% for w in report.warnings %}<div class="alert alert-warn">{{ w }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<div class="section">
+  <div class="section-title">Import History</div>
+  <div class="card table-wrap">
+    <table>
+      <tr><th>Symbol</th><th>Exchange</th><th>Rows</th><th>From</th><th>To</th><th>Adjusted</th><th>Status</th><th>Source</th><th>Imported</th></tr>
+      {% for r in imports %}
+      <tr>
+        <td><strong>{{ r.symbol }}</strong></td><td>{{ r.exchange }}</td><td>{{ r.row_count }}</td>
+        <td>{{ r.date_start }}</td><td>{{ r.date_end }}</td><td>{{ r.adjusted }}</td>
+        <td><span class="badge badge-{{ 'ok' if r.validation_status=='ok' else 'err' }}">{{ r.validation_status }}</span></td>
+        <td>{{ r.source_name or 'csv' }}</td><td>{{ (r.imported_at or '')[:19] }}</td>
+      </tr>
+      {% endfor %}
+      {% if not imports %}<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:24px;">No imports yet.</td></tr>{% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Watchlist — Swing Trader{% endblock %}
+{% block content %}
+<h2>Market Watchlist</h2>
+<p class="subtitle">Symbols you research. Import data in Data Centre first.</p>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="form-row" style="margin-bottom:0;align-items:end;">
+    <div><label>Symbol</label><input id="wl-symbol" placeholder="e.g. RELIANCE" maxlength="30"></div>
+    <div style="max-width:120px;"><label>Exchange</label><select id="wl-exchange"><option>NSE</option><option>BSE</option></select></div>
+    <div style="flex:0;"><button class="btn btn-primary" onclick="addSymbol()">Add</button></div>
+    <div style="flex:0;"><a href="/api/watchlist/export" class="btn btn-outline">Export CSV</a></div>
+  </div>
+</div>
+
+<div class="card table-wrap">
+  <table id="wl-table">
+    <tr><th>Symbol</th><th>Exchange</th><th>Name</th><th>Candles</th><th>Last Data</th><th></th></tr>
+    {% for r in watchlist %}
+    <tr>
+      <td><a href="/research/{{ r.symbol }}"><strong>{{ r.symbol }}</strong></a></td>
+      <td>{{ r.exchange }}</td>
+      <td>{{ r.name or '—' }}</td>
+      <td>{{ r.candle_count }}</td>
+      <td>{{ r.last_candle_ts or '—' }}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="removeSymbol('{{ r.symbol }}','{{ r.exchange }}')">Remove</button></td>
+    </tr>
+    {% endfor %}
+    {% if not watchlist %}
+    <tr><td colspan="6" style="text-align:center;color:var(--text2);padding:30px;">Watchlist is empty. Add a symbol above.</td></tr>
+    {% endif %}
+  </table>
+</div>
+
+<script>
+async function addSymbol() {
+  const s = document.getElementById('wl-symbol').value.trim();
+  const e = document.getElementById('wl-exchange').value;
+  if (!s) return toast('Enter a symbol', 'error');
+  const r = await api('/api/watchlist/add', 'POST', {symbol: s, exchange: e});
+  if (r.ok) { toast(r.has_data ? 'Added '+r.symbol : 'Added '+r.symbol+' (no data yet)', 'success'); setTimeout(()=>location.reload(), 600); }
+  else toast(r.error, 'error');
+}
+async function removeSymbol(s, e) {
+  await api('/api/watchlist/remove', 'POST', {symbol: s, exchange: e});
+  location.reload();
+}
+</script>
+{% endblock %}

@@ -1,7 +1,7 @@
 # Pinned dependency set — AI Swing-Trading Research Assistant (India)
 # Verified on Python 3.14.7 (Windows 10/11, 8 GB RAM). See docs/SETUP_WINDOWS.md.
 # Install: python -m pip install -r requirements.txt
-streamlit==1.65.0
+flask==3.1.3
 pandas==3.0.6
 numpy==2.5.4
 plotly==7.1.0

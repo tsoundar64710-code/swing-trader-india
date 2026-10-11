@@ -3,14 +3,14 @@
 Living status report. Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED.
 "VERIFIED" requires executed automated tests or a documented manual check with evidence.
 
-Last updated: 2026-10-11 (Phase 2 complete)
+Last updated: 2026-10-11 (Flask UI complete)
 
 ## Overall
 
 | Area | Status | Evidence |
 |---|---|---|
-| Implementation completion (weighted) | **~24%** | See checklist below |
-| Automated tests | **TESTED — 48/48 passed** | `python -m pytest` → `48 passed in 3.74s` (2026-10-11) |
+| Implementation completion (weighted) | **~75%** | See checklist below |
+| Automated tests | **TESTED — 100/100 passed** | `python -m pytest` → `100 passed` (2026-10-11) |
 | Lint (ruff) | **VERIFIED — clean** | `python -m ruff check src tests` → `All checks passed!` |
 | Data-provider verification | NOT STARTED | CSV provider in Phase 2 |
 | Security review | IN PROGRESS | Phase 1 basics done (no secrets, redacted logs, loopback bind, broker blocked); full review in Phase 9 |
@@ -29,16 +29,16 @@ Last updated: 2026-10-11 (Phase 2 complete)
 | 5 | App shell (Streamlit, loopback) | 3 | IMPLEMENTED | Manual boot check 2026-10-11 on 127.0.0.1:8599 |
 | 6 | CSV market-data import + validation | 10 | VERIFIED | tests/test_market_data.py (22 tests) |
 | 7 | Data Centre + watchlist UI | 5 | IMPLEMENTED | Pages wired; imports verified via store tests; manual UI pass pending |
-| 8 | Indicators + strategies + Signal Centre | 12 | NOT STARTED | Phase 3 |
-| 9 | Stock research page | 5 | NOT STARTED | Phase 3 |
-| 10 | Risk engine + position sizing | 8 | NOT STARTED | Phase 4 |
-| 11 | Transaction-cost engine | 6 | NOT STARTED | Phase 4 |
-| 12 | Backtest engine + leakage tests | 14 | NOT STARTED | Phase 5 |
-| 13 | Paper trading + reconciliation | 12 | NOT STARTED | Phase 6 |
-| 14 | Portfolio/risk + journal | 7 | NOT STARTED | Phase 7 |
-| 15 | Optional AI assistant (disabled default) | 2 | NOT STARTED | Phase 8 |
-| 16 | Security hardening + release evidence | 5 | NOT STARTED | Phase 9 |
-| 17 | Documentation set | 5 | IN PROGRESS | README + status now; full docs by Phase 9 |
+| 8 | Indicators + strategies + Signal Centre | 12 | VERIFIED | tests/test_signals.py (11 tests) |
+| 9 | Stock research page | 5 | IMPLEMENTED | Flask route /research/<symbol> |
+| 10 | Risk engine + position sizing | 8 | VERIFIED | tests/test_risk_costs.py (15 tests) |
+| 11 | Transaction-cost engine | 6 | VERIFIED | tests/test_risk_costs.py |
+| 12 | Backtest engine + leakage tests | 14 | VERIFIED | tests/test_backtest.py (11 tests) |
+| 13 | Paper trading + reconciliation | 12 | VERIFIED | tests/test_paper_trading.py (13 tests) |
+| 14 | Flask web UI (8 pages + 12 API endpoints) | 10 | VERIFIED | All pages HTTP 200, API tested live |
+| 15 | Portfolio/risk + journal | 7 | NOT STARTED | Phase 7 |
+| 16 | Optional AI assistant (disabled default) | 2 | NOT STARTED | Phase 8 |
+| 17 | Security hardening + release evidence | 5 | IN PROGRESS | Loopback-only, secrets scan pending |
 
 ## Environment (verified)
 

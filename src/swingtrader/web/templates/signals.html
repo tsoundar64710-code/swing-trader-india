@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Signal Centre — Swing Trader{% endblock %}
+{% block content %}
+<h2>Signal Centre</h2>
+<p class="subtitle">Rule-based research outputs — not buy/sell instructions</p>
+
+<div class="alert alert-warn">
+  BUY SETUP = all research rules passed on the latest valid candle. It does NOT mean the trade will profit.
+  A stop-loss cannot guarantee its fill price.
+</div>
+
+<div class="card table-wrap">
+  <table id="sig-table">
+    <tr><th>Symbol</th><th>Action</th><th>Data As Of</th><th>Entry</th><th>Stop</th><th>Target</th><th>R:R</th><th>Reason</th></tr>
+  </table>
+</div>
+
+<script>
+async function loadSignals() {
+  const r = await api('/api/signals');
+  const t = document.getElementById('sig-table');
+  let html = '<tr><th>Symbol</th><th>Action</th><th>Data As Of</th><th>Entry</th><th>Stop</th><th>Target</th><th>R:R</th><th>Reason</th></tr>';
+  for (const s of r.signals) {
+    html += `<tr>
+      <td><a href="/research/${s.symbol}"><strong>${s.symbol}</strong></a></td>
+      <td>${badge(s.action)}</td>
+      <td>${s.data_ts}</td>
+      <td>${s.entry ? '₹'+s.entry : '—'}</td>
+      <td>${s.stop ? '₹'+s.stop : '—'}</td>
+      <td>${s.target ? '₹'+s.target : '—'}</td>
+      <td>${s.rr || '—'}</td>
+      <td style="max-width:280px;font-size:12px;">${s.reason || ''}</td>
+    </tr>`;
+  }
+  t.innerHTML = html;
+}
+loadSignals();
+</script>
+{% endblock %}

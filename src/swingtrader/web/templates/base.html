@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Swing Trader India{% endblock %}</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="logo">📈</span>
+      <div>
+        <h1>Swing Trader</h1>
+        <small>India · v{{ version }}</small>
+      </div>
+    </div>
+    <nav>
+      <a href="/" class="{{ 'active' if request.path == '/' }}">Dashboard</a>
+      <a href="/watchlist" class="{{ 'active' if request.path == '/watchlist' }}">Watchlist</a>
+      <a href="/signals" class="{{ 'active' if request.path == '/signals' }}">Signal Centre</a>
+      <a href="/strategy-lab" class="{{ 'active' if request.path == '/strategy-lab' }}">Strategy Lab</a>
+      <a href="/paper" class="{{ 'active' if request.path == '/paper' }}">Paper Trading</a>
+      <a href="/data" class="{{ 'active' if request.path == '/data' }}">Data Centre</a>
+      <a href="/settings" class="{{ 'active' if request.path == '/settings' }}">Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="mode-badge">{{ operating_mode }}</div>
+      {% if not live_trading %}
+      <div class="safe-badge">✓ Live trading disabled</div>
+      {% endif %}
+    </div>
+  </aside>
+
+  <main class="main">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<script src="/static/js/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

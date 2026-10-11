@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Swing Trader{% endblock %}
+{% block content %}
+<h2>Dashboard</h2>
+<p class="subtitle">Portfolio overview and system status</p>
+
+<div class="grid grid-4">
+  <div class="card"><h3>Operating Mode</h3><div class="metric-value" style="color:var(--yellow);font-size:18px;">{{ operating_mode }}</div><div class="metric-sub">Research & paper only</div></div>
+  <div class="card"><h3>Simulated Cash</h3><div class="metric-value">₹{{ "{:,.2f}".format(cash) }}</div></div>
+  <div class="card"><h3>Portfolio Equity</h3><div class="metric-value">₹{{ "{:,.2f}".format(equity) }}</div></div>
+  <div class="card"><h3>Realized P&L</h3><div class="metric-value" style="color:{{ 'var(--green)' if realized_pnl >= 0 else 'var(--red)' }}">₹{{ "{:,.2f}".format(realized_pnl) }}</div></div>
+</div>
+
+<div class="grid grid-3">
+  <div class="card"><h3>Open Positions</h3><div class="metric-value">{{ n_positions }}</div></div>
+  <div class="card"><h3>Signals Generated</h3><div class="metric-value">{{ n_signals }}</div></div>
+  <div class="card"><h3>Watchlist Size</h3><div class="metric-value">{{ watchlist | length }}</div></div>
+</div>
+
+{% if positions %}
+<div class="section">
+  <div class="section-title">Open Positions</div>
+  <div class="card table-wrap">
+    <table>
+      <tr><th>Symbol</th><th>Qty</th><th>Avg Cost</th><th>Last Price</th><th>Unrealized P&L</th></tr>
+      {% for p in positions %}
+      <tr>
+        <td><strong>{{ p.symbol }}</strong></td>
+        <td>{{ p.qty }}</td>
+        <td>₹{{ "{:,.2f}".format(p.avg_cost) }}</td>
+        <td>{% if p.symbol in prices %}₹{{ "{:,.2f}".format(prices[p.symbol]) }}{% else %}—{% endif %}</td>
+        <td>{% if p.symbol in prices %}<span style="color:{{ 'var(--green)' if prices[p.symbol] > p.avg_cost else 'var(--red)' }}">₹{{ "{:,.2f}".format((prices[p.symbol] - p.avg_cost) * p.qty) }}</span>{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if not cost_warning.startswith('Cost schedule') %}
+<div class="alert alert-warn">{{ cost_warning }}</div>
+{% endif %}
+
+<div class="alert alert-info">
+  <strong>Disclaimer:</strong> This is an educational research tool, not investment advice.
+  Past performance never guarantees future results. Live trading is disabled.
+</div>
+{% endblock %}

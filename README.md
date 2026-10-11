@@ -45,6 +45,7 @@ cd swing-trader-india
 - Windows 10/11
 - ~200 MB disk for dependencies
 - No GPU, no Docker, no cloud services
+- Flask + Plotly.js (CDN) for the web UI
 
 ## Data
 

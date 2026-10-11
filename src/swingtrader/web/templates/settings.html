@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Settings — Swing Trader{% endblock %}
+{% block content %}
+<h2>Settings</h2>
+<p class="subtitle">Changes are validated and saved to data/settings.json</p>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="section-title">Capital & Risk</div>
+  <div class="form-row">
+    <div><label>Initial Capital (₹)</label><input id="st-capital" type="number" value="{{ settings.initial_capital_inr }}" min="1000"></div>
+    <div><label>Max Position %</label><input id="st-maxpos" type="number" value="{{ settings.risk.max_position_pct }}"></div>
+    <div><label>Max Risk/Trade %</label><input id="st-maxrisk" type="number" step="0.1" value="{{ settings.risk.max_risk_per_trade_pct }}"></div>
+    <div><label>Max Open Positions</label><input id="st-maxopen" type="number" value="{{ settings.risk.max_open_positions }}"></div>
+  </div>
+  <div class="form-row">
+    <div><label>Max Portfolio Exposure %</label><input id="st-maxexp" type="number" value="{{ settings.risk.max_portfolio_exposure_pct }}"></div>
+    <div><label>Max Drawdown %</label><input id="st-maxdd" type="number" value="{{ settings.risk.max_drawdown_pct }}"></div>
+    <div><label>Daily Loss Limit %</label><input id="st-dailyloss" type="number" step="0.1" value="{{ settings.risk.daily_loss_limit_pct }}"></div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="section-title">Strategy Parameters</div>
+  <div class="form-row">
+    <div><label>Fast SMA</label><input id="st-fast" type="number" value="{{ settings.strategy.sma_fast }}"></div>
+    <div><label>Slow SMA</label><input id="st-slow" type="number" value="{{ settings.strategy.sma_slow }}"></div>
+    <div><label>ATR Stop Multiplier</label><input id="st-atr" type="number" step="0.1" value="{{ settings.strategy.atr_stop_multiplier }}"></div>
+    <div><label>Min Reward:Risk</label><input id="st-rr" type="number" step="0.1" value="{{ settings.strategy.min_reward_risk }}"></div>
+  </div>
+</div>
+
+<button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+<span id="st-msg" style="margin-left:12px;font-size:13px;"></span>
+
+<div class="alert alert-warn" style="margin-top:24px;">
+  Live trading is hard-disabled in this release and cannot be enabled from Settings.
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="section-title">Cost Assumptions</div>
+  <pre style="font-size:12px;color:var(--text2);">{{ settings.costs.model_dump_json(indent=2) }}</pre>
+</div>
+
+<script>
+async function saveSettings() {
+  const r = await api('/api/settings', 'POST', {
+    initial_capital_inr: parseFloat(document.getElementById('st-capital').value),
+    max_position_pct: parseFloat(document.getElementById('st-maxpos').value),
+    max_risk_per_trade_pct: parseFloat(document.getElementById('st-maxrisk').value),
+    max_open_positions: parseInt(document.getElementById('st-maxopen').value),
+    max_portfolio_exposure_pct: parseFloat(document.getElementById('st-maxexp').value),
+    max_drawdown_pct: parseFloat(document.getElementById('st-maxdd').value),
+    daily_loss_limit_pct: parseFloat(document.getElementById('st-dailyloss').value),
+    sma_fast: parseInt(document.getElementById('st-fast').value),
+    sma_slow: parseInt(document.getElementById('st-slow').value),
+    atr_stop_multiplier: parseFloat(document.getElementById('st-atr').value),
+    min_reward_risk: parseFloat(document.getElementById('st-rr').value),
+  });
+  const msg = document.getElementById('st-msg');
+  if (r.ok) { msg.textContent = '✓ Saved'; msg.style.color = 'var(--green)'; toast('Settings saved','success'); }
+  else { msg.textContent = '✗ ' + r.error; msg.style.color = 'var(--red)'; }
+}
+</script>
+{% endblock %}
