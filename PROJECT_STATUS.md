@@ -3,14 +3,14 @@
 Living status report. Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED.
 "VERIFIED" requires executed automated tests or a documented manual check with evidence.
 
-Last updated: 2026-10-11 (Phase 7 complete — Portfolio/Risk + Journal, docs set)
+Last updated: 2026-10-11 (Phase 8 complete — local assistant, 114 tests)
 
 ## Overall
 
 | Area | Status | Evidence |
 |---|---|---|
-| Implementation completion (weighted) | **~90%** | See checklist below |
-| Automated tests | **TESTED — 100/100 passed** | `python -m pytest` → `100 passed` (2026-10-11) |
+| Implementation completion (weighted) | **~95%** | See checklist below |
+| Automated tests | **TESTED — 114/114 passed** | `python -m pytest` → `114 passed` (2026-10-11) |
 | Lint (ruff) | **VERIFIED — clean** | `python -m ruff check src tests` → `All checks passed!` |
 | Data-provider verification | VERIFIED (CSV path) | tests/test_market_data.py (22 tests); provider = user CSV |
 | Security review | VERIFIED (local-only) | docs/SECURITY.md threat table; secrets scan clean; loopback-only |
@@ -38,7 +38,7 @@ Last updated: 2026-10-11 (Phase 7 complete — Portfolio/Risk + Journal, docs se
 | 13 | Paper trading + reconciliation | 12 | VERIFIED | tests/test_paper_trading.py (13 tests) |
 | 14 | Flask web UI (9 pages + 16 API endpoints) | 10 | VERIFIED | All 9 pages HTTP 200, 100 tests, ruff clean |
 | 15 | Portfolio/risk + journal | 7 | VERIFIED | routes.py portfolio_page/journal_page; 10/10 pages OK |
-| 16 | Optional AI assistant (disabled default) | 2 | NOT STARTED | Phase 8 (optional) |
+| 16 | Optional AI assistant (disabled default) | 2 | VERIFIED | tests/test_assistant.py (14 tests); disabled by default; refuses advice |
 | 17 | Security hardening + release evidence | 5 | VERIFIED | docs/SECURITY.md threat table; 14-file docs set; CHANGELOG |
 
 ## Environment (verified)
@@ -56,4 +56,4 @@ Last updated: 2026-10-11 (Phase 7 complete — Portfolio/Risk + Journal, docs se
 
 ## Next action
 
-Phase 8 (optional): local AI assistant, disabled by default. Phase 9 security/release items complete — app is ready for paper-trading use.
+All planned phases (0-9) complete. App is ready for paper-trading research use. Remaining optional work: verified live data provider, corporate-actions handling, multi-asset portfolio backtest, live-trading phase (requires separate approval per docs/GROWW_INTEGRATION_PLAN.md).

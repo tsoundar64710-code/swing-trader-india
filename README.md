@@ -18,7 +18,7 @@ laptop with 8 GB RAM. **No live order submission. No guaranteed returns.**
 | Flask web UI (9 pages, 16 API endpoints) | ✅ HTTP 200 tested |
 | Portfolio & Risk page | ✅ Implemented |
 | Trade Journal page | ✅ Implemented |
-| Optional local AI assistant | ⏳ Phase 8 |
+| Optional local AI assistant | ✅ Implemented (disabled by default, local rules only) |
 | Live trading (Groww) | ❌ Disabled by design |
 
 ## Quick start (Windows)

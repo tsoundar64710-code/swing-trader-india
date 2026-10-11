@@ -15,7 +15,10 @@
 - Flask web UI: 9 pages, 16 JSON API endpoints, dark theme, Plotly.js charts
 - Portfolio & Risk page with concentration chart and breach detection
 - Trade Journal page with rationale, exit, violations, lessons
-- 100 automated tests, ruff lint clean
+- Local rule-based assistant (Phase 8): disabled by default, answers factual
+  questions about watchlist/signals/positions/cash/journal/strategy/risk/costs
+  from the local DB only; refuses buy/sell advice; no external model calls
+- 114 automated tests, ruff lint clean
 - Live trading hard-disabled (LIVE_TRADING_ENABLED=False, broker methods raise OrderError)
 
 ### Known Limitations

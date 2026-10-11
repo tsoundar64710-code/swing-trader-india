@@ -17,6 +17,7 @@
 | Dependency vulnerabilities | Pinned versions, `pip-audit` recommended | ✓ |
 | Unauthorized access | Single-user local app, no auth needed | Documented |
 | Accidental live orders | LIVE_TRADING_ENABLED=False, broker raises OrderError | ✓ + tested |
+| Assistant data exfiltration | Local rules only; no external model/network calls; disabled by default | ✓ |
 
 ## Not applicable (documented)
 

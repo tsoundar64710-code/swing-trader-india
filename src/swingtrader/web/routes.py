@@ -538,6 +538,48 @@ def api_journal():
     return jsonify({"ok": True, "entries": entries})
 
 
+# ────────────────────────────────────────────── API: assistant
+
+
+@bp.get("/assistant")
+def assistant_page():
+    s = current_app.config["SETTINGS"]
+    return render_template("assistant.html", **_ctx(enabled=s.ai.enabled))
+
+
+@bp.post("/api/assistant/chat")
+def api_assistant_chat():
+    s = current_app.config["SETTINGS"]
+    if not s.ai.enabled:
+        return jsonify({
+            "ok": False,
+            "error": "Assistant is disabled. Enable it on the Assistant page.",
+        }), 403
+    conn = current_app.config["DB"]
+    data = request.get_json(force=True)
+    question = (data.get("question") or "").strip()
+    if not question:
+        return jsonify({"ok": False, "error": "Question is empty."}), 400
+    from swingtrader.ai import Assistant
+    reply = Assistant(conn, s).answer(question)
+    return jsonify({
+        "ok": True,
+        "answer": reply.answer,
+        "refused": reply.refused,
+        "data": reply.data,
+    })
+
+
+@bp.post("/api/assistant/enable")
+def api_assistant_enable():
+    s = current_app.config["SETTINGS"]
+    data = request.get_json(force=True) or {}
+    enabled = data.get("enabled", True)
+    s.ai.enabled = bool(enabled)
+    save_settings(s)
+    return jsonify({"ok": True, "enabled": s.ai.enabled})
+
+
 # ────────────────────────────────────────────── API: health
 
 

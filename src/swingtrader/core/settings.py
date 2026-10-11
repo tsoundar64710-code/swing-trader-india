@@ -53,6 +53,18 @@ class CostAssumptions(BaseModel):
     config_verified_date: str = "UNVERIFIED"
 
 
+class AISettings(BaseModel):
+    """Optional assistant settings. Disabled by default; local rules only.
+
+    No API keys are stored here. Secrets may only be read from environment
+    variables if a future external provider is explicitly enabled.
+    """
+
+    enabled: bool = False  # must be explicitly turned on by the user
+    provider: str = "local_rules"  # only provider in this release
+    max_context_rows: int = Field(20, ge=1, le=200)
+
+
 class DataSettings(BaseModel):
     interval: str = "1d"
     timezone: str = "Asia/Kolkata"
@@ -90,7 +102,7 @@ class AppSettings(BaseModel):
     costs: CostAssumptions = Field(default_factory=CostAssumptions)
     data: DataSettings = Field(default_factory=DataSettings)
     strategy: StrategySettings = Field(default_factory=StrategySettings)
-    ai_explanation_enabled: bool = False  # optional LLM, off by default
+    ai: AISettings = Field(default_factory=AISettings)
 
     @property
     def live_trading_enabled(self) -> bool:

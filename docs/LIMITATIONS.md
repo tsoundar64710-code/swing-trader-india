@@ -40,7 +40,7 @@ This is an honest assessment of what the application does and does not do.
 - **Single-user, single-machine.** No multi-user, remote access, or collaboration.
 - **Local SQLite only.** No cloud sync, no PostgreSQL.
 - **No automated test of UI rendering.** Pages are smoke-tested (HTTP 200) only.
-- **AI assistant not implemented** (Phase 8).
+- **AI assistant is rule-based only** (Phase 8). It answers factual questions from local DB data and refuses buy/sell advice. It is not a language model and cannot analyze charts or news.
 - **No timezone-aware market calendar.** Indian sessions are handled by data dates, not a live exchange calendar.
 
 ## Known risks of use
