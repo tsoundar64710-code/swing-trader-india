@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets and local env
+.env
+
+# Local data (user imports, paper-trading DB, backups)
+data/imports/*
+data/backups/*
+!data/imports/.gitkeep
+!data/backups/.gitkeep
+
+# App runtime state
+*.db
+*.db-journal
+*.log
+logs/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
