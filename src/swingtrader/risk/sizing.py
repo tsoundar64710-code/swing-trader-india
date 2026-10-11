@@ -14,7 +14,12 @@ import math
 from dataclasses import dataclass, field
 
 from swingtrader.core.settings import AppSettings
-from swingtrader.costs.engine import estimate_costs, round_trip_cost_estimate
+from swingtrader.costs.engine import (
+    estimate_costs,
+    per_share_buy_cost,
+    per_share_round_trip_cost,
+    round_trip_cost_estimate,
+)
 
 
 @dataclass
@@ -89,13 +94,11 @@ def size_position(
     plan.risk_budget_inr = equity * risk.max_risk_per_trade_pct / 100
 
     # --- quantity by risk budget (costs included conservatively per share) ---
-    rt = round_trip_cost_estimate(entry, costs)
-    per_share_rt_cost = rt["round_trip_total"]
+    per_share_rt_cost = per_share_round_trip_cost(entry, costs)
     qty_by_risk = int(math.floor(plan.risk_budget_inr / (risk_per_share + per_share_rt_cost)))
 
-    # --- quantity by cash ---
-    buy_costs_1 = estimate_costs(entry, "BUY", costs)
-    per_share_buy = entry + buy_costs_1["total"]
+    # --- quantity by cash (buy cost per share incl. statutory charges, no slippage) ---
+    per_share_buy = entry + per_share_buy_cost(entry, costs)
     qty_by_cash = int(math.floor(portfolio.cash_inr / per_share_buy)) if per_share_buy > 0 else 0
 
     # --- quantity by max position notional ---

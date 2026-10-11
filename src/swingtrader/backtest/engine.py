@@ -22,7 +22,12 @@ import pandas as pd
 
 from swingtrader.backtest.metrics import compute_metrics
 from swingtrader.core.settings import AppSettings
-from swingtrader.costs.engine import apply_slippage, estimate_costs
+from swingtrader.costs.engine import (
+    apply_slippage,
+    estimate_costs,
+    per_share_buy_cost,
+    per_share_round_trip_cost,
+)
 from swingtrader.strategies.indicators import add_indicators
 from swingtrader.strategies.signals import evaluate_trend_pullback
 
@@ -156,14 +161,15 @@ def run_backtest(
             fill = apply_slippage(float(ind["open"].iloc[exec_bar]), "BUY", settings.costs)
             risk_per_share = fill - pending_stop
             risk_budget = cash * settings.risk.max_risk_per_trade_pct / 100
-            # conservative whole-share sizing under risk budget + cash
-            buy1 = estimate_costs(fill, "BUY", settings.costs)
-            sell1 = estimate_costs(fill, "SELL", settings.costs)
-            denom = risk_per_share + buy1["total"] + sell1["total"]
+            # conservative whole-share sizing under risk budget + cash + notional limit
+            per_share_rt = per_share_round_trip_cost(fill, settings.costs)
+            denom = risk_per_share + per_share_rt
             qty_by_risk = int(math.floor(risk_budget / denom)) if denom > 0 else 0
-            per_share_buy = fill + buy1["total"]
+            per_share_buy = fill + per_share_buy_cost(fill, settings.costs)
             qty_by_cash = int(math.floor(cash / per_share_buy)) if per_share_buy > 0 else 0
-            qty = min(qty_by_risk, qty_by_cash)
+            max_notional = cash * settings.risk.max_position_pct / 100
+            qty_by_notional = int(math.floor(max_notional / fill)) if fill > 0 else 0
+            qty = min(qty_by_risk, qty_by_cash, qty_by_notional)
             if qty >= 1 and risk_per_share > 0:
                 costs_e = estimate_costs(fill * qty, "BUY", settings.costs)
                 if fill * qty + costs_e["total"] <= cash + 1e-6:

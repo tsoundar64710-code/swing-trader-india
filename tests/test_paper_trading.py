@@ -152,7 +152,8 @@ def test_fees_recorded_on_fills(tmp_db: sqlite3.Connection) -> None:
     e = engine(tmp_db)
     e.place_market_order("F", "BUY", 10, ref_price=1000)
     fill = tmp_db.execute("SELECT * FROM fills ORDER BY id DESC LIMIT 1").fetchone()
-    assert fill["brokerage"] > 0
+    # Delivery brokerage is 0% at discount brokers; statutory fees (STT, stamp,
+    # exchange, SEBI, GST) must still be recorded and > 0.
     assert fill["taxes_fees"] > 0
     order = tmp_db.execute("SELECT status FROM orders").fetchone()
     assert order["status"] == "FILLED"

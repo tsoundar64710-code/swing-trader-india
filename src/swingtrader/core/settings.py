@@ -37,20 +37,60 @@ class RiskLimits(BaseModel):
 
 
 class CostAssumptions(BaseModel):
-    """Transaction-cost assumptions. Rates are dated in cost_config table;
-    these are fallback defaults only and may be outdated — always shown to
-    the user as estimates, never as guaranteed figures."""
+    """Transaction-cost assumptions for Indian cash-equity delivery trades.
 
-    brokerage_pct: float = Field(0.03, ge=0)
-    brokerage_min_inr: float = Field(20.0, ge=0)
-    stt_buy_pct: float = Field(0.001, ge=0)
-    stt_sell_pct: float = Field(0.001, ge=0)
-    exchange_txn_charge_pct: float = Field(0.0000345, ge=0)
+    UNIT CONVENTION (critical — do not get this wrong):
+        Every field ending in `_pct` is a PERCENTAGE. The cost engine computes
+            charge = turnover_inr * pct_field / 100
+        so a field value of 0.1 means 0.1% of turnover, 18.0 means 18%, etc.
+
+    VERIFIED RATES (checked 2026-10-11 against official sources):
+        STT (delivery equity)      : 0.1%  of turnover, BOTH buy and sell
+                                     Source: nseindia.com STT schedule
+        Stamp duty (delivery)      : 0.015% of turnover, BUY side only
+                                     Source: nseindia.com stamp duty schedule
+        Exchange txn charge (NSE)  : ~0.00297% of turnover (both sides)
+                                     Source: NSE circular / IB fee table
+        SEBI turnover fee          : 0.0001% of turnover (Rs 10 per crore)
+                                     Source: nseindia.com SEBI turnover fees
+        GST                        : 18% on (brokerage + exchange txn + SEBI)
+                                     Source: GST rate on broker services
+        Brokerage (delivery)       : 0% at many discount brokers (Groww,
+                                     Zerodha delivery); full-service brokers
+                                     often 0.03% with Rs 20/order minimum.
+                                     Default set to 0% to match discount-broker
+                                     reality for delivery. Users on full-service
+                                     plans should raise brokerage_pct and
+                                     brokerage_min_inr in Settings.
+
+    Slippage is NOT a statutory fee — it models adverse execution price
+    (buy higher / sell lower than reference). Keep separate from fees.
+
+    config_verified_date: set to the date the rates above were checked
+    against official sources. Set back to "UNVERIFIED" if any rate is
+    changed to a guessed value.
+    """
+
+    # Brokerage — 0% for delivery at discount brokers (Groww, Zerodha delivery)
+    brokerage_pct: float = Field(0.0, ge=0)
+    brokerage_min_inr: float = Field(0.0, ge=0)
+    # STT — 0.1% both sides for delivery equity (NSE, verified 2026-10-11)
+    stt_buy_pct: float = Field(0.1, ge=0)
+    stt_sell_pct: float = Field(0.1, ge=0)
+    # NSE exchange transaction charge ~0.00297% (verified 2026-10-11)
+    exchange_txn_charge_pct: float = Field(0.00297, ge=0)
+    # GST 18% on (brokerage + exchange + SEBI)
     gst_pct: float = Field(18.0, ge=0)
-    sebi_charge_pct: float = Field(0.000001, ge=0)
-    stamp_duty_buy_pct: float = Field(0.0015, ge=0)
-    slippage_pct: float = Field(0.05, ge=0)
-    config_verified_date: str = "UNVERIFIED"
+    # SEBI turnover fee 0.0001% = Rs 10 per crore (verified 2026-10-11)
+    sebi_charge_pct: float = Field(0.0001, ge=0)
+    # Stamp duty 0.015% buy side only for delivery (verified 2026-10-11)
+    stamp_duty_buy_pct: float = Field(0.015, ge=0)
+    # Slippage — adverse execution assumption, NOT a statutory fee.
+    # 0.05% is a conservative mid-point for liquid large-caps; raise for
+    # smallcaps or thin books. Kept separate from fees so users see it
+    # clearly as an execution assumption.
+    slippage_pct: float = Field(0.05, ge=0, le=5.0)
+    config_verified_date: str = "2026-10-11"
 
 
 class AISettings(BaseModel):

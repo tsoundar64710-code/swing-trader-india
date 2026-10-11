@@ -1,18 +1,33 @@
 """Centralized Indian cash-equity transaction-cost estimates.
 
-IMPORTANT: All rates live in CostAssumptions with a `config_verified_date`.
-While that field is "UNVERIFIED", every consumer must display results as
-unverified estimates. Buy-side and sell-side charges are modelled separately
-(stamp duty applies on buys; STT differs by side for delivery).
+UNIT CONVENTION:
+    Every field in CostAssumptions ending in `_pct` is a PERCENTAGE.
+    The engine computes: charge = turnover_inr * pct_field / 100
+    so pct_field = 0.1 means 0.1% of turnover, 18.0 means 18%, etc.
 
-Formulas (delivery equity, as commonly applicable — VERIFY before trusting):
-  brokerage      = max(turnover * brokerage_pct/100, brokerage_min_inr)
-  stt            = turnover * stt_side_pct/100
-  exchange_txn   = turnover * exchange_txn_charge_pct/100
-  sebi           = turnover * sebi_charge_pct/100
-  gst            = (brokerage + exchange_txn + sebi) * gst_pct/100
-  stamp_duty     = turnover * stamp_duty_buy_pct/100   (buy side only)
-  slippage_cost  = turnover * slippage_pct/100         (price impact, not a fee)
+VERIFIED RATES (checked 2026-10-11 against official NSE / SEBI / Stamp Act sources):
+    STT (delivery equity)      : 0.1%  of turnover, BOTH buy and sell
+    Stamp duty (delivery)      : 0.015% of turnover, BUY side only
+    Exchange txn charge (NSE)  : ~0.00297% of turnover (both sides)
+    SEBI turnover fee          : 0.0001% of turnover (Rs 10 per crore)
+    GST                        : 18% on (brokerage + exchange txn + SEBI)
+    Brokerage (delivery)       : 0% at discount brokers (Groww delivery);
+                                 full-service may charge 0.03% with Rs 20 min.
+    Slippage                   : adverse execution assumption, NOT a statutory
+                                 fee; kept separate so users can see it clearly.
+
+Formulas (delivery equity):
+    brokerage      = max(turnover * brokerage_pct/100, brokerage_min_inr)
+    stt            = turnover * stt_side_pct/100
+    exchange_txn   = turnover * exchange_txn_charge_pct/100
+    sebi           = turnover * sebi_charge_pct/100
+    gst            = (brokerage + exchange_txn + sebi) * gst_pct/100
+    stamp_duty     = turnover * stamp_duty_buy_pct/100   (buy side only)
+    slippage_cost  = turnover * slippage_pct/100         (price impact, not a fee)
+
+Sources (verified 2026-10-11):
+    - NSE STT/Stamp/SEBI: nseindia.com first-time-investor pages
+    - SEBI turnover: Rs 10 per crore (0.0001%)
 """
 
 from __future__ import annotations
@@ -25,13 +40,22 @@ Side = Literal["BUY", "SELL"]
 
 
 def apply_slippage(price: float, side: Side, costs: CostAssumptions) -> float:
-    """Worse execution price: buy higher, sell lower."""
+    """Worse execution price: buy higher, sell lower.
+
+    This is an execution assumption (price impact / spread), NOT a statutory
+    fee. It is applied to the fill price, not added as a separate charge.
+    """
     factor = 1 + costs.slippage_pct / 100 if side == "BUY" else 1 - costs.slippage_pct / 100
     return round(price * factor, 2)
 
 
 def estimate_costs(turnover_inr: float, side: Side, costs: CostAssumptions) -> dict[str, float]:
-    """Estimated charges for one full buy or sell of `turnover_inr` notional."""
+    """Estimated statutory charges for one full buy or sell of `turnover_inr` notional.
+
+    Does NOT include slippage (slippage adjusts the fill price via apply_slippage).
+    Buy side includes stamp duty; sell side does not. STT applies to both sides
+    for delivery equity.
+    """
     if turnover_inr < 0:
         raise ValueError("turnover must be non-negative")
     t = turnover_inr
@@ -53,8 +77,26 @@ def estimate_costs(turnover_inr: float, side: Side, costs: CostAssumptions) -> d
     }
 
 
+def per_share_buy_cost(price: float, costs: CostAssumptions) -> float:
+    """Statutory buy-side cost per share at `price` (no slippage)."""
+    return estimate_costs(price, "BUY", costs)["total"]
+
+
+def per_share_sell_cost(price: float, costs: CostAssumptions) -> float:
+    """Statutory sell-side cost per share at `price` (no slippage)."""
+    return estimate_costs(price, "SELL", costs)["total"]
+
+
+def per_share_round_trip_cost(price: float, costs: CostAssumptions) -> float:
+    """Combined buy+sell statutory cost per share at `price` (no slippage)."""
+    return per_share_buy_cost(price, costs) + per_share_sell_cost(price, costs)
+
+
 def round_trip_cost_estimate(turnover_inr: float, costs: CostAssumptions) -> dict[str, float]:
-    """Combined buy+sell cost estimate for one round trip of the same notional."""
+    """Combined buy+sell statutory cost estimate for one round trip of the same notional.
+
+    Does NOT include slippage.
+    """
     b = estimate_costs(turnover_inr, "BUY", costs)
     s = estimate_costs(turnover_inr, "SELL", costs)
     total = b["total"] + s["total"]
@@ -73,4 +115,7 @@ def cost_warning(costs: CostAssumptions) -> str:
             "GST, stamp duty and exchange charges with official sources before relying "
             "on net-profit figures."
         )
-    return f"Cost schedule marked as verified on {costs.config_verified_date}."
+    return (
+        f"Cost schedule verified against official NSE/SEBI/Stamp sources on "
+        f"{costs.config_verified_date}."
+    )

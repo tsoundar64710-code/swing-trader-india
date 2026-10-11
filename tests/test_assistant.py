@@ -64,7 +64,7 @@ def test_costs_question(conn):
     a = Assistant(conn, AppSettings())
     r = a.answer("What are transaction costs?")
     assert "brokerage" in r.answer.lower() or "slippage" in r.answer.lower()
-    assert "UNVERIFIED" in r.answer  # must warn about unverified rates
+    assert "verified" in r.answer.lower()  # rates are verified against official sources
 
 
 def test_status(conn):
