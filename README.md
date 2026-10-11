@@ -15,9 +15,9 @@ laptop with 8 GB RAM. **No live order submission. No guaranteed returns.**
 | Position sizing + risk limits + cost engine | ✅ Tested (15 tests) |
 | Backtesting with leakage protections | ✅ Tested (11 tests) |
 | Paper-trading engine with reconciliation | ✅ Tested (13 tests) |
-| Streamlit UI (Dashboard, Research, Signals, Strategy Lab, Data Centre) | ✅ Running |
-| Portfolio & Risk page | ⏳ Phase 7 |
-| Trade Journal page | ⏳ Phase 7 |
+| Flask web UI (9 pages, 16 API endpoints) | ✅ HTTP 200 tested |
+| Portfolio & Risk page | ✅ Implemented |
+| Trade Journal page | ✅ Implemented |
 | Optional local AI assistant | ⏳ Phase 8 |
 | Live trading (Groww) | ❌ Disabled by design |
 
