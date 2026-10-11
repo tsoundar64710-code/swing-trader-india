@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Market — Swing Trader{% endblock %}
+{% block content %}
+<h2>Market Overview</h2>
+<p class="subtitle">NSE/BSE session status, indices, global context and breadth. All prices labeled with source and quality.</p>
+
+<div class="card" id="status-card" style="margin-bottom:16px;">
+  <div class="section-title">Market Session</div>
+  <div id="mkt-status">Loading…</div>
+</div>
+
+<div class="section">
+  <div class="section-title">Indian Indices <small style="color:var(--text2);font-weight:400;">(Yahoo Finance proxy — END_OF_DAY)</small></div>
+  <div id="indices-grid" class="grid grid-3"><div class="card">Loading…</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">Global & Macro Context <small style="color:var(--text2);font-weight:400;">(END_OF_DAY)</small></div>
+  <div id="macro-grid" class="grid grid-3"><div class="card">Loading…</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">Watchlist Breadth & Sector Strength</div>
+  <button class="btn btn-primary" onclick="loadBreadth()">Compute from watchlist</button>
+  <div id="breadth-out" style="margin-top:12px;"></div>
+</div>
+
+<div class="section">
+  <div class="section-title">Watchlist Quotes</div>
+  <button class="btn" onclick="loadWatchQuotes()">Fetch watchlist quotes</button>
+  <div id="quotes-out" style="margin-top:12px;"></div>
+</div>
+
+<script>
+function qBadge(q) {
+  const colors = {LIVE:'var(--green)',DELAYED:'var(--yellow)',END_OF_DAY:'var(--blue)',HISTORICAL:'var(--text2)',UNAVAILABLE:'var(--red)'};
+  const c = colors[q] || 'var(--text2)';
+  return `<span style="color:${c};font-weight:600;font-size:11px;">${q}</span>`;
+}
+function chgHtml(q) {
+  if (q.change_pct == null) return '<span style="color:var(--text2)">—</span>';
+  const c = q.change_pct >= 0 ? 'var(--green)' : 'var(--red)';
+  const s = q.change_pct >= 0 ? '+' : '';
+  return `<span style="color:${c}">${s}${q.change_pct.toFixed(2)}%</span>`;
+}
+async function loadStatus() {
+  const r = await api('/api/market/status');
+  const el = document.getElementById('mkt-status');
+  if (r.ok) {
+    const oc = r.is_open ? 'var(--green)' : 'var(--red)';
+    el.innerHTML = `<strong style="color:${oc}">${r.session}</strong> — ${r.note}<br><small style="color:var(--text2)">IST now: ${r.now_ist}</small>`;
+  }
+}
+async function loadIndices() {
+  const r = await api('/api/market/indices');
+  const el = document.getElementById('indices-grid');
+  if (!r.ok) { el.innerHTML = '<div class="alert alert-error">'+r.error+'</div>'; return; }
+  el.innerHTML = r.quotes.map(q => `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;"><strong>${q.name}</strong>${qBadge(q.quality)}</div>
+      <div class="metric-value">${q.price != null ? q.price.toLocaleString('en-IN',{maximumFractionDigits:2}) : '—'}</div>
+      <div>${chgHtml(q)}</div>
+      <small style="color:var(--text2)">${q.symbol} · ${q.source} · ${q.timestamp.slice(0,16)}Z</small>
+      ${q.error ? '<div style="color:var(--red);font-size:12px;">'+q.error+'</div>' : ''}
+    </div>`).join('');
+}
+async function loadMacro() {
+  const r = await api('/api/market/macro');
+  const el = document.getElementById('macro-grid');
+  if (!r.ok) { el.innerHTML = '<div class="alert alert-error">'+r.error+'</div>'; return; }
+  el.innerHTML = r.quotes.map(q => `
+    <div class="card" style="padding:10px;">
+      <div style="display:flex;justify-content:space-between;"><strong style="font-size:13px;">${q.name}</strong>${qBadge(q.quality)}</div>
+      <div style="font-size:16px;font-weight:600;">${q.price != null ? q.price.toLocaleString('en-IN',{maximumFractionDigits:2}) : '—'}</div>
+      <div style="font-size:12px;">${chgHtml(q)}</div>
+    </div>`).join('');
+}
+async function loadBreadth() {
+  const out = document.getElementById('breadth-out');
+  out.innerHTML = '<div class="card">Computing… (fetches quotes, may take a moment)</div>';
+  const r = await api('/api/market/breadth');
+  if (!r.ok) { out.innerHTML = '<div class="alert alert-error">'+r.error+'</div>'; return; }
+  const b = r.breadth;
+  out.innerHTML = `<div class="card">
+    <div class="grid grid-4">
+      <div><h3>Advances</h3><div class="metric-value" style="color:var(--green)">${b.advances}</div></div>
+      <div><h3>Declines</h3><div class="metric-value" style="color:var(--red)">${b.declines}</div></div>
+      <div><h3>A/D Ratio</h3><div class="metric-value">${b.ad_ratio}</div></div>
+      <div><h3>Breadth</h3><div class="metric-value">${b.breadth}</div></div>
+    </div>
+    ${b.unavailable ? '<p style="color:var(--yellow);font-size:13px;">'+b.unavailable+' symbols unavailable — not counted.</p>' : ''}
+  </div>`;
+}
+async function loadWatchQuotes() {
+  const out = document.getElementById('quotes-out');
+  out.innerHTML = '<div class="card">Fetching…</div>';
+  const wl = await api('/api/watchlist');
+  if (!wl.ok || !wl.items || !wl.items.length) { out.innerHTML = '<div class="alert alert-info">Watchlist empty.</div>'; return; }
+  let html = '<div class="card table-wrap"><table><tr><th>Symbol</th><th>Price</th><th>Change</th><th>Quality</th><th>Source</th><th>Timestamp</th></tr>';
+  for (const w of wl.items.slice(0, 20)) {
+    const q = await api('/api/market/quote/' + encodeURIComponent(w.symbol));
+    const d = q.quote || {};
+    html += `<tr><td><strong>${w.symbol}</strong></td>
+      <td>${d.price != null ? d.price.toLocaleString('en-IN') : '—'}</td>
+      <td>${chgHtml(d)}</td><td>${qBadge(d.quality)}</td>
+      <td style="font-size:12px;color:var(--text2)">${d.source||''}</td>
+      <td style="font-size:12px;color:var(--text2)">${(d.timestamp||'').slice(0,16)}Z</td></tr>`;
+  }
+  html += '</table></div>';
+  out.innerHTML = html;
+}
+loadStatus(); loadIndices(); loadMacro();
+</script>
+{% endblock %}

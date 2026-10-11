@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## 0.2.0 (2026-10-11) — Market Intelligence Release
+
+### Added
+- yfinance market data provider with explicit provenance labels
+  (LIVE/DELAYED/END_OF_DAY/HISTORICAL/UNAVAILABLE — never claims LIVE)
+- Market dashboard: NSE/BSE session status, 13 indices, 14 global/macro
+  tickers, breadth (advance/decline), sector strength
+- Stock scanner with transparent 8-component scoring (trend, momentum,
+  volume, structure, volatility, liquidity, relative strength, R:R).
+  NO_CLEAR_SETUP verdict when evidence is weak — no forced picks.
+- News retrieval via Yahoo Finance with publisher/time/URL, impact
+  interpretation tags (separated from facts), freshness and dedupe
+- Trade Planner: entry zone, stop, targets, R:R after costs, risk-based
+  sizing, max rupee loss, full cost breakdown, invalidation conditions,
+  reasons-to-avoid
+- Alert engine: stop/target proximity, breakout/breakdown, volume spike,
+  big move, stale data. Cooldown dedupe per condition.
+- Notification centre: in-app log, Windows desktop toast, quiet hours,
+  severity filter, duplicate suppression, delivery-failure recording
+- AI assistant upgraded with market context (status, indices, sectors,
+  macro, news summary, scanner guidance)
+- 29 new tests (total 159)
+
+### Fixed
+- Transaction-cost rates corrected 10-100x (STT, stamp duty, exchange,
+  SEBI) against official NSE/SEBI sources; verified 2026-10-11
+- Backtest engine now enforces max_position_pct
+- Slippage doc/code mismatch resolved
+
+### Known Limitations
+- yfinance data is END_OF_DAY/delayed — never real-time tick data
+- News coverage is sparse on weekends; provider-dependent
+- Public holidays not fetched (market_status notes this)
+- No email/Telegram notifications (by design, no secrets)
+
 ## 0.1.0 (2026-10-11) — Initial Release
 
 ### Added

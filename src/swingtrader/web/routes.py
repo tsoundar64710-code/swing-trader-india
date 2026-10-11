@@ -580,6 +580,279 @@ def api_assistant_enable():
     return jsonify({"ok": True, "enabled": s.ai.enabled})
 
 
+# ────────────────────────────────────────────── Market dashboard
+
+
+@bp.get("/market")
+def market_page():
+    return render_template("market.html", **_ctx())
+
+
+@bp.get("/api/market/status")
+def api_market_status():
+    from swingtrader.market.provider import market_status
+    return jsonify({"ok": True, **market_status().to_dict()})
+
+
+@bp.get("/api/market/indices")
+def api_market_indices():
+    from swingtrader.market.provider import fetch_indices
+    qs = fetch_indices()
+    return jsonify({"ok": True, "quotes": [q.to_dict() for q in qs]})
+
+
+@bp.get("/api/market/macro")
+def api_market_macro():
+    from swingtrader.market.provider import fetch_macro
+    qs = fetch_macro()
+    return jsonify({"ok": True, "quotes": [q.to_dict() for q in qs]})
+
+
+@bp.get("/api/market/quote/<symbol>")
+def api_market_quote(symbol: str):
+    from swingtrader.market.provider import fetch_quote
+    q = fetch_quote(symbol)
+    return jsonify({"ok": True, "quote": q.to_dict()})
+
+
+@bp.get("/api/market/breadth")
+def api_market_breadth():
+    from swingtrader.market.provider import fetch_quotes, market_breadth
+    conn = current_app.config["DB"]
+    rows = list_watchlist(conn)
+    symbols = [r["symbol"] for r in rows][:30]
+    if not symbols:
+        return jsonify({"ok": False, "error": "Watchlist empty — add symbols first."}), 400
+    qs = fetch_quotes(symbols)
+    return jsonify({"ok": True, "breadth": market_breadth(qs),
+                    "quotes": [q.to_dict() for q in qs]})
+
+
+# ────────────────────────────────────────────── Scanner
+
+
+@bp.get("/scanner")
+def scanner_page():
+    return render_template("scanner.html", **_ctx())
+
+
+@bp.post("/api/scanner/run")
+def api_scanner_run():
+    conn = current_app.config["DB"]
+    s = current_app.config["SETTINGS"]
+    from swingtrader.market.provider import SECTOR_MAP, fetch_quote
+    from swingtrader.market.scanner import rank_stocks, scan_stock
+
+    data = request.get_json(force=True) or {}
+    symbols = data.get("symbols") or []
+    if not symbols:
+        rows = list_watchlist(conn)
+        symbols = [r["symbol"] for r in rows][:20]
+    if not symbols:
+        return jsonify({"ok": False, "error": "No symbols to scan."}), 400
+
+    # Benchmark: Nifty 1-month change for relative strength
+    bench = fetch_quote("^NSEI")
+    bench_1m = None
+    if bench.price and bench.prev_close:
+        bench_1m = bench.change_pct
+
+    results = []
+    for sym in symbols:
+        inst_id = get_or_create_instrument(conn, sym, "NSE", sym)
+        df = load_candles(conn, inst_id)
+        if len(df) < 60:
+            # try fetching history from provider and upsert directly
+            from swingtrader.market.provider import fetch_history
+            rows, err = fetch_history(sym, period="1y")
+            if rows:
+                with conn:
+                    conn.executemany(
+                        """INSERT INTO candles(instrument_id, ts, open, high, low, close, volume)
+                           VALUES (?,?,?,?,?,?,?)
+                           ON CONFLICT(instrument_id, ts) DO UPDATE SET
+                             open=excluded.open, high=excluded.high, low=excluded.low,
+                             close=excluded.close, volume=excluded.volume""",
+                        [(inst_id, r["ts"], r["open"], r["high"], r["low"],
+                          r["close"], r["volume"]) for r in rows],
+                    )
+                df = load_candles(conn, inst_id)
+        sector = SECTOR_MAP.get(sym.upper(), "Other")
+        r = scan_stock(sym, df, s.strategy, sector=sector,
+                       benchmark_change_pct=bench_1m)
+        results.append(r)
+
+    ranked = rank_stocks(results)
+    return jsonify({"ok": True, "results": [r.to_dict() for r in ranked]})
+
+
+# ────────────────────────────────────────────── News
+
+
+@bp.get("/news")
+def news_page():
+    return render_template("news.html", **_ctx())
+
+
+@bp.get("/api/news")
+def api_news():
+    symbol = request.args.get("symbol")
+    from swingtrader.market.news import dedupe_news, fetch_yahoo_news
+    items = fetch_yahoo_news(symbol)
+    items = dedupe_news(items)
+    return jsonify({"ok": True, "items": [i.to_dict() for i in items],
+                    "count": len(items)})
+
+
+# ────────────────────────────────────────────── Trade planner
+
+
+@bp.get("/planner")
+def planner_page():
+    return render_template("planner.html", **_ctx())
+
+
+@bp.post("/api/planner/build")
+def api_planner_build():
+    conn = current_app.config["DB"]
+    s = current_app.config["SETTINGS"]
+    from swingtrader.market.planner import build_trade_plan
+    from swingtrader.market.provider import fetch_quote
+    from swingtrader.paper.engine import PaperEngine
+    from swingtrader.risk.sizing import PortfolioState
+
+    data = request.get_json(force=True)
+    symbol = (data.get("symbol") or "").strip().upper()
+    entry = float(data.get("entry", 0))
+    stop = float(data.get("stop", 0))
+    target = data.get("target")
+    target = float(target) if target else None
+    rationale = data.get("rationale", "")
+
+    if not symbol or entry <= 0 or stop <= 0:
+        return jsonify({"ok": False, "error": "symbol, entry and stop are required."}), 400
+
+    engine = PaperEngine(conn, s)
+    cash = engine.cash()
+    positions = engine.positions()
+    exposure = sum(p["avg_cost"] * p["qty"] for p in positions)
+    pf = PortfolioState(
+        equity_inr=cash + exposure, cash_inr=cash,
+        open_positions=len(positions), exposure_inr=exposure,
+    )
+
+    q = fetch_quote(symbol)
+    plan = build_trade_plan(
+        symbol, latest_price=q.price, price_timestamp=q.timestamp,
+        price_quality=q.quality, price_source=q.source,
+        entry_reference=entry, stop_price=stop, target_price=target,
+        rationale=rationale, portfolio=pf, settings=s,
+    )
+    return jsonify({"ok": True, "plan": plan.to_dict()})
+
+
+# ────────────────────────────────────────────── Alerts & notifications
+
+
+@bp.get("/alerts")
+def alerts_page():
+    return render_template("alerts.html", **_ctx())
+
+
+@bp.post("/api/alerts/check")
+def api_alerts_check():
+    conn = current_app.config["DB"]
+    s = current_app.config["SETTINGS"]
+    from swingtrader.market.alerts import AlertEngine
+    from swingtrader.market.provider import fetch_quotes
+    from swingtrader.strategies.indicators import add_indicators
+
+    engine = AlertEngine()
+    rows = list_watchlist(conn)
+    symbols = [r["symbol"] for r in rows][:20]
+    if not symbols:
+        return jsonify({"ok": False, "error": "Watchlist empty."}), 400
+
+    quotes = {q.symbol.upper(): q for q in fetch_quotes(symbols)}
+    all_alerts = []
+    for row in rows:
+        sym = row["symbol"]
+        q = quotes.get(sym.upper())
+        if not q or q.price is None:
+            continue
+        # Load candles for support/resistance/volume context
+        inst = find_instrument(conn, sym)
+        support = resistance = avg_vol = None
+        if inst:
+            df = load_candles(conn, inst["id"])
+            if len(df) >= 20:
+                from swingtrader.core.settings import StrategySettings
+                ind = add_indicators(df, StrategySettings())
+                support = float(ind["low"].tail(20).min())
+                resistance = float(ind["high"].tail(20).max())
+                avg_vol = float(ind["volume"].tail(20).mean())
+        age_h = None
+        if q.timestamp:
+            try:
+                from datetime import datetime as _dt
+                age_h = (_dt.now(UTC) - _dt.fromisoformat(q.timestamp)).total_seconds() / 3600
+            except ValueError:
+                pass
+        alerts = engine.check_symbol(
+            sym, price=q.price, volume=q.volume, avg_volume=avg_vol,
+            prev_close=q.prev_close, support=support, resistance=resistance,
+            data_age_hours=age_h, stale_after_days=s.data.stale_after_days,
+        )
+        all_alerts.extend(alerts)
+
+    # Also check open paper positions for stop/target proximity
+    from swingtrader.paper.engine import PaperEngine
+    paper = PaperEngine(conn, s)
+    for p in paper.positions():
+        q = quotes.get(p["symbol"].upper())
+        if q and q.price:
+            stop_alerts = engine.check_symbol(
+                p["symbol"], price=q.price,
+                stop=p["stop_price"], target=p["target_price"],
+            )
+            all_alerts.extend(stop_alerts)
+
+    return jsonify({"ok": True, "alerts": [a.to_dict() for a in all_alerts]})
+
+
+@bp.get("/api/notifications")
+def api_notifications():
+    from swingtrader.market.notify import NotificationCenter
+    conn = current_app.config["DB"]
+    nc = NotificationCenter(conn)
+    return jsonify({"ok": True, "items": nc.history(100)})
+
+
+@bp.post("/api/notifications/prefs")
+def api_notification_prefs():
+    from swingtrader.market.notify import NotificationPrefs
+    s = current_app.config["SETTINGS"]
+    data = request.get_json(force=True) or {}
+    # Store in settings.ai-adjacent slot via simple attributes on settings
+    if not hasattr(s, "notify"):
+        s.notify = NotificationPrefs()
+    if "desktop_toast" in data:
+        s.notify.desktop_toast = bool(data["desktop_toast"])
+    if "quiet_hours_start" in data:
+        s.notify.quiet_hours_start = str(data["quiet_hours_start"])
+    if "quiet_hours_end" in data:
+        s.notify.quiet_hours_end = str(data["quiet_hours_end"])
+    if "min_severity" in data:
+        s.notify.min_severity = str(data["min_severity"]).upper()
+    save_settings(s)
+    return jsonify({"ok": True, "prefs": {
+        "desktop_toast": s.notify.desktop_toast,
+        "quiet_hours_start": s.notify.quiet_hours_start,
+        "quiet_hours_end": s.notify.quiet_hours_end,
+        "min_severity": s.notify.min_severity,
+    }})
+
+
 # ────────────────────────────────────────────── API: health
 
 

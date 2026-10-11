@@ -9,16 +9,20 @@ laptop with 8 GB RAM. **No live order submission. No guaranteed returns.**
 | Feature | Status |
 |---|---|
 | CSV historical data import + validation | ✅ Tested (22 tests) |
-| Market watchlist with freshness warnings | ✅ Implemented |
-| Deterministic indicators (SMA, RSI, ATR, volume) | ✅ Tested (11 tests) |
+| Live/EOD market data via Yahoo Finance (NSE/BSE) | ✅ Verified — END_OF_DAY quality |
+| Market dashboard: indices, breadth, sectors, macro | ✅ Verified |
+| News retrieval with impact tagging | ✅ Verified |
+| Stock scanner with transparent scoring | ✅ Verified |
+| Trade Planner (entry/stop/target/costs/sizing) | ✅ Verified |
+| Alert engine + notification centre | ✅ Verified |
+| Deterministic indicators (SMA, RSI, ATR, volume) | ✅ Tested |
 | Rule-based signal engine (BUY_SETUP / WAIT / NO_TRADE) | ✅ Tested |
-| Position sizing + risk limits + cost engine | ✅ Tested (15 tests) |
-| Backtesting with leakage protections | ✅ Tested (11 tests) |
-| Paper-trading engine with reconciliation | ✅ Tested (13 tests) |
-| Flask web UI (9 pages, 16 API endpoints) | ✅ HTTP 200 tested |
-| Portfolio & Risk page | ✅ Implemented |
-| Trade Journal page | ✅ Implemented |
-| Optional local AI assistant | ✅ Implemented (disabled by default, local rules only) |
+| Position sizing + risk limits + verified cost engine | ✅ Tested |
+| Backtesting with leakage protections | ✅ Tested |
+| Paper-trading engine with reconciliation | ✅ Tested |
+| Flask web UI (15 pages, 30+ API endpoints) | ✅ Running |
+| Portfolio & Risk + Journal | ✅ Implemented |
+| Local AI assistant (market context, no external LLM) | ✅ Implemented |
 | Live trading (Groww) | ❌ Disabled by design |
 
 ## Quick start (Windows)

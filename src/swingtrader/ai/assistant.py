@@ -36,12 +36,13 @@ class Assistant:
         q = original.lower()
         if not q:
             return AssistantReply(
-                "Ask me about your watchlist, signals, positions, cash, journal, or strategy rules."
+                "Ask me about your watchlist, signals, positions, cash, journal, strategy rules, "
+                "market status, sectors, or news."
             )
 
         if q in {"hi", "hello", "hey", "namaste"}:
             return AssistantReply(
-                "Hello. I answer questions about your local trading data. "
+                "Hello. I answer questions about your local trading data and market context. "
                 "I do not give buy/sell advice."
             )
 
@@ -69,6 +70,12 @@ class Assistant:
             (r"strategy|sma|rsi|atr|rule|param", self._strategy),
             (r"risk|limit|drawdown|stop.?loss|max", self._risk),
             (r"cost|fee|charge|brokerage|slippage|stt", self._costs),
+            (r"market\s*(status|open|closed|session)|is the market", self._market_status),
+            (r"nifty|sensex|index|indices|bank\s*nifty", self._market_indices),
+            (r"sector|strength|strongest|weakest|relative", self._sector_question),
+            (r"global|us market|asia|fed|rbi|crude|oil|gold|usd|inr|dollar", self._macro_question),
+            (r"news|headline|announcement|event", self._news_question),
+            (r"scanner|scan|rank|candidate|score", self._scanner_question),
             (r"status|summary|overview|dashboard|health", self._status),
         ]
         symbol = self._extract_symbol(original)
@@ -224,8 +231,91 @@ class Assistant:
             f"- Signals computed: {signals}\n"
             f"- Open positions: {positions}\n"
             f"- Live trading: DISABLED (by design)\n"
-            f"- Assistant provider: local rules only (no external calls)",
+            f"- Assistant provider: local rules + market context (no external LLM)",
             data={"signals": signals, "positions": positions, "watchlist": watch},
+        )
+
+    # ── market context handlers ────────────────────────────────────
+
+    def _market_status(self) -> AssistantReply:
+        from swingtrader.market.provider import market_status
+        ms = market_status()
+        return AssistantReply(
+            f"Indian market session: {ms.session} ({'OPEN' if ms.is_open else 'CLOSED'})\n"
+            f"{ms.note}\nIST time: {ms.now_ist}",
+            data=ms.to_dict(),
+        )
+
+    def _market_indices(self) -> AssistantReply:
+        from swingtrader.market.provider import fetch_indices
+        qs = fetch_indices(["NIFTY_50", "SENSEX", "NIFTY_BANK"])
+        lines = []
+        for q in qs:
+            if q.price:
+                chg = f"{q.change_pct:+.2f}%" if q.change_pct is not None else "—"
+                lines.append(f"- {q.name}: {q.price:,.2f} ({chg}) [{q.quality}]")
+            else:
+                lines.append(f"- {q.name}: unavailable ({q.error or 'no data'})")
+        return AssistantReply(
+            "Major indices (Yahoo Finance, END_OF_DAY quality — not live):\n" + "\n".join(lines),
+            data={"quotes": [q.to_dict() for q in qs]},
+        )
+
+    def _sector_question(self) -> AssistantReply:
+        from swingtrader.market.provider import SECTOR_MAP, fetch_quotes, sector_strength
+        rows = self.conn.execute(
+            "SELECT i.symbol FROM watchlist w JOIN instruments i ON i.id=w.instrument_id LIMIT 20"
+        ).fetchall()
+        symbols = [r["symbol"] for r in rows]
+        if not symbols:
+            return AssistantReply("Watchlist empty — add symbols to compute sector strength.")
+        qs = fetch_quotes(symbols)
+        ss = sector_strength(qs, SECTOR_MAP)
+        lines = [f"- {sec}: {d['avg_change_pct']:+.2f}% avg ({d['count']} stocks)"
+                 for sec, d in ss["sectors"].items()]
+        return AssistantReply(
+            "Sector strength from watchlist (END_OF_DAY, interpreted aggregation):\n"
+            + "\n".join(lines)
+            + f"\nStrongest: {ss['strongest_sector']} · Weakest: {ss['weakest_sector']}",
+            data=ss,
+        )
+
+    def _macro_question(self) -> AssistantReply:
+        from swingtrader.market.provider import fetch_macro
+        qs = fetch_macro(["US_SNP500", "CRUDE_OIL", "GOLD", "USD_INR", "US_10Y", "VIX"])
+        lines = []
+        for q in qs:
+            if q.price:
+                chg = f"{q.change_pct:+.2f}%" if q.change_pct is not None else "—"
+                lines.append(f"- {q.name}: {q.price:,.2f} ({chg}) [{q.quality}]")
+            else:
+                lines.append(f"- {q.name}: unavailable")
+        return AssistantReply(
+            "Global/macro context (END_OF_DAY, not live):\n" + "\n".join(lines),
+            data={"quotes": [q.to_dict() for q in qs]},
+        )
+
+    def _news_question(self) -> AssistantReply:
+        from swingtrader.market.news import fetch_yahoo_news, summarize_news
+        items = fetch_yahoo_news(None, count=10)
+        return AssistantReply(
+            summarize_news(items, max_items=8),
+            data={"count": len([i for i in items if i.headline])},
+        )
+
+    def _scanner_question(self) -> AssistantReply:
+        rows = self.conn.execute(
+            "SELECT i.symbol FROM watchlist w JOIN instruments i ON i.id=w.instrument_id LIMIT 10"
+        ).fetchall()
+        if not rows:
+            return AssistantReply("Watchlist empty — run the Scanner page to evaluate stocks.")
+        syms = [r["symbol"] for r in rows]
+        return AssistantReply(
+            "I can tell you which watchlist symbols exist, but live scoring requires "
+            "the Scanner page (it fetches market data). Your watchlist: "
+            + ", ".join(syms)
+            + ". Visit /scanner to run a full transparent score.",
+            data={"symbols": syms},
         )
 
     # ── helpers ───────────────────────────────────────────────────

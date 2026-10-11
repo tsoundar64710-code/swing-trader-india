@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}News — Swing Trader{% endblock %}
+{% block content %}
+<h2>Global & Indian News</h2>
+<p class="subtitle">Retrieved headlines with publisher, time, source URL and interpreted impact tags. Facts and interpretations are clearly separated.</p>
+
+<div class="card" style="margin-bottom:16px;">
+  <div style="display:flex;gap:8px;">
+    <input id="news-symbol" placeholder="Symbol filter (optional, e.g. RELIANCE)" style="flex:1;">
+    <button class="btn btn-primary" onclick="loadNews()">Fetch news</button>
+  </div>
+  <p style="color:var(--text2);font-size:12px;margin-top:6px;">
+    Source: Yahoo Finance news (free, no API key). Impact tags are <strong>interpretations</strong>, not facts. Never claim a headline caused a price move.
+  </p>
+</div>
+
+<div id="news-out"></div>
+
+<script>
+const impColor = {POSITIVE:'var(--green)',NEGATIVE:'var(--red)',MIXED:'var(--yellow)',UNKNOWN:'var(--text2)'};
+async function loadNews() {
+  const out = document.getElementById('news-out');
+  out.innerHTML = '<div class="card">Fetching news…</div>';
+  const sym = document.getElementById('news-symbol').value.trim();
+  const url = '/api/news' + (sym ? '?symbol=' + encodeURIComponent(sym) : '');
+  const r = await api(url);
+  if (!r.ok) { out.innerHTML = '<div class="alert alert-error">'+r.error+'</div>'; return; }
+  if (!r.items.length) { out.innerHTML = '<div class="alert alert-info">No news items returned by the provider.</div>'; return; }
+  out.innerHTML = `<p style="color:var(--text2);font-size:13px;margin-bottom:10px;">${r.count} items retrieved. Impact tags are model interpretations.</p>` +
+    r.items.filter(i=>i.headline).map(renderItem).join('');
+}
+function renderItem(i) {
+  const ic = impColor[i.impact]||'var(--text2)';
+  const dup = i.duplicate_of ? `<span class="badge badge-warn" style="font-size:10px;">DUPLICATE</span>` : '';
+  const fresh = i.is_fresh ? `<span class="badge badge-ok" style="font-size:10px;">FRESH</span>` : `<span style="color:var(--text2);font-size:11px;">${i.age_hours!=null?Math.round(i.age_hours)+'h old':'age unknown'}</span>`;
+  return `<div class="card" style="margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:start;">
+      <strong style="flex:1;">${i.headline} ${dup}</strong>
+      ${fresh}
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin:4px 0;">
+      ${i.publisher||'unknown'} · ${i.published_utc?i.published_utc.slice(0,16)+'Z':'time unknown'}
+      ${i.url?` · <a href="${i.url}" target="_blank" rel="noopener" style="color:var(--blue);">source</a>`:''}
+    </div>
+    ${i.summary?`<p style="font-size:13px;color:var(--text2);margin:6px 0;">${i.summary}</p>`:''}
+    <div style="font-size:12px;">
+      <span style="color:${ic};font-weight:600;">[interpreted: ${i.impact}]</span>
+      ${i.sectors.length?' Sectors: '+i.sectors.join(', '):''}
+      · confidence: ${i.confidence}
+      ${i.symbols.length?' · '+i.symbols.join(', '):''}
+    </div>
+  </div>`;
+}
+</script>
+{% endblock %}

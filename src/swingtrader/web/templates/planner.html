@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Trade Planner — Swing Trader{% endblock %}
+{% block content %}
+<h2>Trade Planner</h2>
+<p class="subtitle">Build a conditional, cost-aware trade plan. Not a recommendation — a research estimate.</p>
+
+<div class="card" style="margin-bottom:16px;">
+  <div class="section-title">Setup Parameters</div>
+  <div class="form-row">
+    <div><label>Symbol</label><input id="tp-symbol" placeholder="RELIANCE"></div>
+    <div><label>Entry reference (₹)</label><input id="tp-entry" type="number" step="0.01" placeholder="2500"></div>
+    <div><label>Stop-loss (₹)</label><input id="tp-stop" type="number" step="0.01" placeholder="2450"></div>
+    <div><label>Target (₹, optional)</label><input id="tp-target" type="number" step="0.01" placeholder="2600"></div>
+  </div>
+  <div class="form-row">
+    <div><label>Rationale</label><input id="tp-rationale" placeholder="Why this setup?"></div>
+  </div>
+  <button class="btn btn-primary" onclick="buildPlan()">Build plan</button>
+  <span id="tp-msg" style="margin-left:10px;font-size:13px;"></span>
+</div>
+
+<div id="plan-out"></div>
+
+<script>
+async function buildPlan() {
+  const out = document.getElementById('plan-out');
+  out.innerHTML = '<div class="card">Building plan… fetching latest price and sizing position.</div>';
+  const body = {
+    symbol: document.getElementById('tp-symbol').value.trim().toUpperCase(),
+    entry: parseFloat(document.getElementById('tp-entry').value),
+    stop: parseFloat(document.getElementById('tp-stop').value),
+    target: document.getElementById('tp-target').value || null,
+    rationale: document.getElementById('tp-rationale').value.trim(),
+  };
+  const r = await api('/api/planner/build', 'POST', body);
+  if (!r.ok) { out.innerHTML = '<div class="alert alert-error">'+r.error+'</div>'; return; }
+  out.innerHTML = renderPlan(r.plan);
+}
+function inr(v) { return v!=null ? '₹'+Number(v).toLocaleString('en-IN',{maximumFractionDigits:2}) : '—'; }
+function renderPlan(p) {
+  const qcolors = {LIVE:'var(--green)',DELAYED:'var(--yellow)',END_OF_DAY:'var(--blue)',HISTORICAL:'var(--text2)',UNAVAILABLE:'var(--red)'};
+  const qc = qcolors[p.price_quality]||'var(--text2)';
+  return `<div class="card" style="margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div><strong style="font-size:18px;">${p.symbol}</strong> <span style="color:var(--text2)">${p.name||''}</span></div>
+      <span class="badge ${p.plan_accepted?'badge-ok':'badge-err'}">${p.plan_accepted?'PLAN READY':'BLOCKED'}</span>
+    </div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">
+      Latest price: <strong style="color:${qc}">${inr(p.latest_price)}</strong>
+      <span style="color:${qc};font-weight:600;">[${p.price_quality}]</span>
+      · ${p.price_source} · ${p.price_timestamp.slice(0,16)}Z
+    </div>
+    <div class="grid grid-3" style="margin-bottom:12px;">
+      <div class="card"><h3>Entry zone</h3><div>${inr(p.entry_low)} – ${inr(p.entry_high)}</div><small style="color:var(--text2)">${p.entry_condition}</small></div>
+      <div class="card"><h3>Stop-loss</h3><div style="color:var(--red)">${inr(p.stop_price)}</div><small style="color:var(--text2)">${p.stop_reason}</small></div>
+      <div class="card"><h3>Targets</h3><div>T1 ${inr(p.target1)} · T2 ${inr(p.target2)}</div><small style="color:var(--text2)">R:R ${p.reward_risk||'—'} (after costs ${p.reward_risk_after_costs||'—'})</small></div>
+    </div>
+    <div class="grid grid-4" style="margin-bottom:12px;">
+      <div class="card"><h3>Qty</h3><div class="metric-value">${p.qty}</div></div>
+      <div class="card"><h3>Notional</h3><div class="metric-value">${inr(p.notional_inr)}</div></div>
+      <div class="card"><h3>Max loss @ stop</h3><div class="metric-value" style="color:var(--red)">${inr(p.max_loss_inr)}</div></div>
+      <div class="card"><h3>Buy costs</h3><div class="metric-value">${inr(p.buy_costs.total)}</div></div>
+    </div>
+    <div class="card" style="margin-bottom:10px;">
+      <div class="section-title" style="font-size:13px;">Cost breakdown (statutory, no slippage)</div>
+      <table style="font-size:13px;">
+        <tr><td>STT</td><td>${inr(p.buy_costs.stt)}</td><td>Stamp duty</td><td>${inr(p.buy_costs.stamp_duty)}</td></tr>
+        <tr><td>Exchange txn</td><td>${inr(p.buy_costs.exchange_txn)}</td><td>SEBI</td><td>${inr(p.buy_costs.sebi)}</td></tr>
+        <tr><td>GST</td><td>${inr(p.buy_costs.gst)}</td><td>Brokerage</td><td>${inr(p.buy_costs.brokerage)}</td></tr>
+        <tr><td>Round-trip total</td><td colspan="3"><strong>${inr(p.round_trip_costs.round_trip_total)}</strong> (${p.round_trip_costs.round_trip_pct}%)</td></tr>
+      </table>
+      <small style="color:var(--yellow)">${p.slippage_note}</small>
+    </div>
+    ${p.reasons_to_avoid.length?`<div class="card" style="border:1px solid var(--yellow);margin-bottom:10px;">
+      <div class="section-title" style="font-size:13px;color:var(--yellow);">Reasons to avoid</div>
+      ${p.reasons_to_avoid.map(r=>`<div style="font-size:13px;">• ${r}</div>`).join('')}
+    </div>`:''}
+    <div class="card">
+      <div class="section-title" style="font-size:13px;">Invalidation conditions</div>
+      ${p.invalidation_conditions.map(c=>`<div style="font-size:13px;color:var(--text2);">• ${c}</div>`).join('')}
+    </div>
+    ${p.rejections.length?`<div class="alert alert-error" style="margin-top:10px;">${p.rejections.join('; ')}</div>`:''}
+    ${p.notes.map(n=>`<div style="font-size:12px;color:var(--text2);margin-top:4px;">${n}</div>`).join('')}
+    <small style="color:var(--text2);display:block;margin-top:8px;">Holding: ${p.holding_period} · Upcoming: ${p.upcoming_events.join(' | ')}</small>
+  </div>`;
+}
+</script>
+{% endblock %}

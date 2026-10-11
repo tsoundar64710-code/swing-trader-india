@@ -19,14 +19,19 @@
     </div>
     <nav>
       <a href="/" class="{{ 'active' if request.path == '/' }}">Dashboard</a>
+      <a href="/market" class="{{ 'active' if request.path == '/market' }}">Market</a>
+      <a href="/news" class="{{ 'active' if request.path == '/news' }}">News</a>
+      <a href="/scanner" class="{{ 'active' if request.path == '/scanner' }}">Scanner</a>
+      <a href="/planner" class="{{ 'active' if request.path == '/planner' }}">Trade Planner</a>
+      <a href="/alerts" class="{{ 'active' if request.path == '/alerts' }}">Alerts</a>
       <a href="/watchlist" class="{{ 'active' if request.path == '/watchlist' }}">Watchlist</a>
-      <a href="/signals" class="{{ 'active' if request.path == '/signals' }}">Signal Centre</a>
+      <a href="/signals" class="{{ 'active' if request.path == '/signals' }}">Signals</a>
       <a href="/strategy-lab" class="{{ 'active' if request.path == '/strategy-lab' }}">Strategy Lab</a>
       <a href="/paper" class="{{ 'active' if request.path == '/paper' }}">Paper Trading</a>
-      <a href="/portfolio" class="{{ 'active' if request.path == '/portfolio' }}">Portfolio & Risk</a>
+      <a href="/portfolio" class="{{ 'active' if request.path == '/portfolio' }}">Portfolio</a>
       <a href="/journal" class="{{ 'active' if request.path == '/journal' }}">Journal</a>
       <a href="/assistant" class="{{ 'active' if request.path == '/assistant' }}">Assistant</a>
-      <a href="/data" class="{{ 'active' if request.path == '/data' }}">Data Centre</a>
+      <a href="/data" class="{{ 'active' if request.path == '/data' }}">Data</a>
       <a href="/settings" class="{{ 'active' if request.path == '/settings' }}">Settings</a>
     </nav>
     <div class="sidebar-footer">

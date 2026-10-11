@@ -3,14 +3,21 @@
 Living status report. Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED.
 "VERIFIED" requires executed automated tests or a documented manual check with evidence.
 
-Last updated: 2026-10-11 (Phase 8 complete — local assistant, 114 tests)
+Last updated: 2026-10-11 (v0.2.0 — Market Intelligence Release)
 
 ## Overall
 
 | Area | Status | Evidence |
 |---|---|---|
-| Implementation completion (weighted) | **~95%** | See checklist below |
-| Automated tests | **TESTED — 114/114 passed** | `python -m pytest` → `114 passed` (2026-10-11) |
+| Implementation completion (weighted) | **~85%** | See checklist below |
+| Automated tests | **TESTED — 159/159 passed** | `python -m pytest` → `159 passed` (2026-10-11) |
+| Lint (ruff) | **VERIFIED — clean** | `python -m ruff check src tests` → `All checks passed!` |
+| Market data provider | **VERIFIED (EOD)** | yfinance Nifty/Sensex/breadth live-tested; quality=END_OF_DAY |
+| News provider | **VERIFIED** | /api/news returns real Yahoo Finance headlines |
+| Scanner | **VERIFIED** | RELIANCE scored WEAK 35/100 (honest, no forced pick) |
+| Transaction costs | **VERIFIED** | Rates checked 2026-10-11 vs NSE/SEBI; 16 independent tests |
+| Security review | VERIFIED (local-only) | docs/SECURITY.md; CSRF pending; loopback-only |
+| **Live trading** | **DISABLED (by design)** | `LIVE_TRADING_ENABLED=False`; broker raises OrderError |
 | Lint (ruff) | **VERIFIED — clean** | `python -m ruff check src tests` → `All checks passed!` |
 | Data-provider verification | VERIFIED (CSV path) | tests/test_market_data.py (22 tests); provider = user CSV |
 | Security review | VERIFIED (local-only) | docs/SECURITY.md threat table; secrets scan clean; loopback-only |

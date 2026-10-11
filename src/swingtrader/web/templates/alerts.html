@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Alerts — Swing Trader{% endblock %}
+{% block content %}
+<h2>Alerts & Notifications</h2>
+<p class="subtitle">Condition-based alerts with exact trigger reason, cooldown dedupe and delivery log.</p>
+
+<div class="card" style="margin-bottom:16px;">
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="checkAlerts()">Check watchlist & positions now</button>
+    <span id="alert-msg" style="font-size:13px;"></span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Triggered Alerts</div>
+  <div id="alerts-out"><div class="alert alert-info">Click "Check" to evaluate conditions.</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">Notification Log</div>
+  <button class="btn" onclick="loadNotifs()">Refresh log</button>
+  <div id="notifs-out" style="margin-top:10px;"></div>
+</div>
+
+<div class="section">
+  <div class="section-title">Notification Preferences</div>
+  <div class="card">
+    <div class="form-row">
+      <div><label><input type="checkbox" id="pref-toast" checked> Desktop toast</label></div>
+      <div><label>Quiet hours start (IST)</label><input id="pref-qs" value="22:00" style="width:100px;"></div>
+      <div><label>Quiet hours end (IST)</label><input id="pref-qe" value="07:00" style="width:100px;"></div>
+      <div><label>Min severity</label><select id="pref-sev"><option>INFO</option><option>WARNING</option><option>CRITICAL</option></select></div>
+    </div>
+    <button class="btn" onclick="savePrefs()">Save prefs</button>
+    <span id="pref-msg" style="margin-left:10px;font-size:13px;"></span>
+  </div>
+</div>
+
+<script>
+const sevColor = {INFO:'var(--blue)',WARNING:'var(--yellow)',CRITICAL:'var(--red)'};
+async function checkAlerts() {
+  const out = document.getElementById('alerts-out');
+  out.innerHTML = '<div class="card">Checking… fetching quotes and evaluating rules.</div>';
+  const r = await api('/api/alerts/check', 'POST', {});
+  if (!r.ok) { out.innerHTML = '<div class="alert alert-error">'+r.error+'</div>'; return; }
+  if (!r.alerts.length) { out.innerHTML = '<div class="alert alert-success">No alerts triggered — all conditions clear.</div>'; return; }
+  out.innerHTML = r.alerts.map(a => `
+    <div class="card" style="margin-bottom:8px;border-left:3px solid ${sevColor[a.severity]||'var(--text2)'};">
+      <div style="display:flex;justify-content:space-between;">
+        <strong style="color:${sevColor[a.severity]}">[${a.severity}] ${a.title}</strong>
+        <small style="color:var(--text2)">${a.ts.slice(0,16)}Z</small>
+      </div>
+      <div style="font-size:13px;margin-top:4px;">${a.detail}</div>
+      <small style="color:var(--text2)">Condition: ${a.condition_key} · ${JSON.stringify(a.evidence)}</small>
+    </div>`).join('');
+}
+async function loadNotifs() {
+  const r = await api('/api/notifications');
+  const out = document.getElementById('notifs-out');
+  if (!r.ok || !r.items.length) { out.innerHTML = '<div class="alert alert-info">No notifications yet.</div>'; return; }
+  out.innerHTML = '<div class="card table-wrap"><table><tr><th>Time</th><th>Sev</th><th>Symbol</th><th>Title</th><th>Delivered</th></tr>' +
+    r.items.map(n => `<tr><td style="font-size:12px;">${n.ts.slice(0,16)}</td>
+      <td style="color:${sevColor[n.severity]||'var(--text2)'}">${n.severity}</td>
+      <td>${n.symbol||''}</td><td>${n.title}</td>
+      <td>${n.delivered?'✓':'—'}</td></tr>`).join('') + '</table></div>';
+}
+async function savePrefs() {
+  const r = await api('/api/notifications/prefs', 'POST', {
+    desktop_toast: document.getElementById('pref-toast').checked,
+    quiet_hours_start: document.getElementById('pref-qs').value,
+    quiet_hours_end: document.getElementById('pref-qe').value,
+    min_severity: document.getElementById('pref-sev').value,
+  });
+  document.getElementById('pref-msg').textContent = r.ok ? 'Saved.' : (r.error||'Failed');
+}
+loadNotifs();
+</script>
+{% endblock %}
